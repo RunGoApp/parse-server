@@ -1,42 +1,39 @@
-import PostgresStorageAdapter from '../src/Adapters/Storage/Postgres/PostgresStorageAdapter';
-const databaseURI = 'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
+const PostgresStorageAdapter = require('../lib/Adapters/Storage/Postgres/PostgresStorageAdapter')
+  .default;
+const databaseURI =
+  'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
 
 const getColumns = (client, className) => {
-  return client.map('SELECT column_name FROM information_schema.columns WHERE table_name = $<className>', { className }, a => a.column_name);
+  return client.map(
+    'SELECT column_name FROM information_schema.columns WHERE table_name = $<className>',
+    { className },
+    a => a.column_name
+  );
+};
+
+const dropTable = (client, className) => {
+  return client.none('DROP TABLE IF EXISTS $<className:name>', { className });
 };
 
 describe_only_db('postgres')('PostgresStorageAdapter', () => {
-  beforeEach(done => {
-    const adapter = new PostgresStorageAdapter({ uri: databaseURI })
-      .deleteAllClasses()
-      .then(() => {
-        adapter.handleShutdown();
-      }, fail)
-      .catch(done);
-  });
-
-  it('handleShutdown, close connection', (done) => {
-    const adapter = new PostgresStorageAdapter({ uri: databaseURI });
-
-    expect(adapter._client.$pool.ending).toEqual(false);
-    adapter.handleShutdown();
-    expect(adapter._client.$pool.ending).toEqual(true);
-    done();
+  const adapter = new PostgresStorageAdapter({ uri: databaseURI });
+  beforeEach(() => {
+    return adapter.deleteAllClasses();
   });
 
   it('schemaUpgrade, upgrade the database schema when schema changes', done => {
-    const adapter = new PostgresStorageAdapter({ uri: databaseURI });
     const client = adapter._client;
     const className = '_PushStatus';
     const schema = {
       fields: {
-        "pushTime": { type: 'String' },
-        "source": { type: 'String' },
-        "query": { type: 'String' },
+        pushTime: { type: 'String' },
+        source: { type: 'String' },
+        query: { type: 'String' },
       },
     };
 
-    adapter.createTable(className, schema)
+    adapter
+      .createTable(className, schema)
       .then(() => getColumns(client, className))
       .then(columns => {
         expect(columns).toContain('pushTime');
@@ -44,7 +41,7 @@ describe_only_db('postgres')('PostgresStorageAdapter', () => {
         expect(columns).toContain('query');
         expect(columns).not.toContain('expiration_interval');
 
-        schema.fields.expiration_interval = { type:'Number' };
+        schema.fields.expiration_interval = { type: 'Number' };
         return adapter.schemaUpgrade(className, schema);
       })
       .then(() => getColumns(client, className))
@@ -59,18 +56,18 @@ describe_only_db('postgres')('PostgresStorageAdapter', () => {
   });
 
   it('schemaUpgrade, maintain correct schema', done => {
-    const adapter = new PostgresStorageAdapter({ uri: databaseURI });
     const client = adapter._client;
     const className = 'Table';
     const schema = {
       fields: {
-        "columnA": { type: 'String' },
-        "columnB": { type: 'String' },
-        "columnC": { type: 'String' },
+        columnA: { type: 'String' },
+        columnB: { type: 'String' },
+        columnC: { type: 'String' },
       },
     };
 
-    adapter.createTable(className, schema)
+    adapter
+      .createTable(className, schema)
       .then(() => getColumns(client, className))
       .then(columns => {
         expect(columns).toContain('columnA');
@@ -91,24 +88,22 @@ describe_only_db('postgres')('PostgresStorageAdapter', () => {
   });
 
   it('Create a table without columns and upgrade with columns', done => {
-    const adapter = new PostgresStorageAdapter({ uri: databaseURI });
     const client = adapter._client;
     const className = 'EmptyTable';
-    let schema = {};
-
-    adapter.createTable(className, schema)
+    dropTable(client, className)
+      .then(() => adapter.createTable(className, {}))
       .then(() => getColumns(client, className))
       .then(columns => {
         expect(columns.length).toBe(0);
 
-        schema = {
+        const newSchema = {
           fields: {
-            "columnA": { type: 'String' },
-            "columnB": { type: 'String' }
+            columnA: { type: 'String' },
+            columnB: { type: 'String' },
           },
         };
 
-        return adapter.schemaUpgrade(className, schema);
+        return adapter.schemaUpgrade(className, newSchema);
       })
       .then(() => getColumns(client, className))
       .then(columns => {
@@ -117,6 +112,42 @@ describe_only_db('postgres')('PostgresStorageAdapter', () => {
         expect(columns).toContain('columnB');
         done();
       })
-      .catch(error => done.fail(error));
-  })
+      .catch(done);
+  });
+
+  it('getClass if exists', async () => {
+    const schema = {
+      fields: {
+        array: { type: 'Array' },
+        object: { type: 'Object' },
+        date: { type: 'Date' },
+      },
+    };
+    await adapter.createClass('MyClass', schema);
+    const myClassSchema = await adapter.getClass('MyClass');
+    expect(myClassSchema).toBeDefined();
+  });
+
+  it('getClass if not exists', async () => {
+    const schema = {
+      fields: {
+        array: { type: 'Array' },
+        object: { type: 'Object' },
+        date: { type: 'Date' },
+      },
+    };
+    await adapter.createClass('MyClass', schema);
+    await expectAsync(adapter.getClass('UnknownClass')).toBeRejectedWith(
+      undefined
+    );
+  });
+});
+
+describe_only_db('postgres')('PostgresStorageAdapter shutdown', () => {
+  it('handleShutdown, close connection', () => {
+    const adapter = new PostgresStorageAdapter({ uri: databaseURI });
+    expect(adapter._client.$pool.ending).toEqual(false);
+    adapter.handleShutdown();
+    expect(adapter._client.$pool.ending).toEqual(true);
+  });
 });

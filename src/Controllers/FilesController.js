@@ -82,7 +82,7 @@ export class FilesController extends AdaptableController {
               encodeURIComponent(filename);
           } else {
             fileObject['url'] = this.adapter.getFileLocation(config, filename);
-          //}
+          }
         }
       }
     }

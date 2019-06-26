@@ -44,6 +44,8 @@ const verifyIdToken = async (token, clientID) => {
 
 // Returns a promise that fulfills if this id_token is valid
 function validateAuthData(authData, options = {}) {
+  console.log('authData', authData);
+  console.log('options', options);
   return verifyIdToken(authData.id_token, options.client_id);
 }
 

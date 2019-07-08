@@ -44,13 +44,7 @@ const verifyIdToken = async (token, clientID) => {
 
 // Returns a promise that fulfills if this id token is valid
 function validateAuthData(authData, options = {}) {
-<<<<<<< HEAD:src/Adapters/Auth/apple-signin.js
-  console.log('authData', authData);
-  console.log('options', options);
-  return verifyIdToken(authData.id_token, options.client_id);
-=======
   return verifyIdToken(authData.id, options.client_id);
->>>>>>> 180ec0090d2ff0b0840c8d4984b11f44010b66a8:src/Adapters/Auth/apple.js
 }
 
 // Returns a promise that fulfills if this app id is valid.

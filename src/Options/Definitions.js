@@ -158,6 +158,10 @@ module.exports.ParseServerOptions = {
     help: 'Mount path for the GraphQL endpoint, defaults to /graphql',
     default: '/graphql',
   },
+  graphQLSchema: {
+    env: 'PARSE_SERVER_GRAPH_QLSCHEMA',
+    help: 'Full path to your GraphQL custom schema.graphql file',
+  },
   host: {
     env: 'PARSE_SERVER_HOST',
     help: 'The host to serve ParseServer on, defaults to 0.0.0.0',
@@ -326,6 +330,14 @@ module.exports.ParseServerOptions = {
     action: parsers.numberParser('schemaCacheTTL'),
     default: 5000,
   },
+  serverCloseComplete: {
+    env: 'PARSE_SERVER_SERVER_CLOSE_COMPLETE',
+    help: 'Callback when server has closed',
+  },
+  serverStartComplete: {
+    env: 'PARSE_SERVER_SERVER_START_COMPLETE',
+    help: 'Callback when server has started',
+  },
   serverURL: {
     env: 'PARSE_SERVER_URL',
     help: 'URL to your parse server with http:// or https://.',
@@ -429,6 +441,11 @@ module.exports.LiveQueryOptions = {
     env: 'PARSE_SERVER_LIVEQUERY_REDIS_URL',
     help: "parse-server's LiveQuery redisURL",
   },
+  wssAdapter: {
+    env: 'PARSE_SERVER_LIVEQUERY_WSS_ADAPTER',
+    help: 'Adapter module for the WebSocketServer',
+    action: parsers.moduleOrObjectParser,
+  },
 };
 module.exports.LiveQueryServerOptions = {
   appId: {
@@ -488,5 +505,10 @@ module.exports.LiveQueryServerOptions = {
     help:
       'Number of milliseconds between ping/pong frames. The WebSocket server sends ping/pong frames to the clients to keep the WebSocket alive. This value defines the interval of the ping/pong frame from the server to clients, defaults to 10 * 1000 ms (10 s).',
     action: parsers.numberParser('websocketTimeout'),
+  },
+  wssAdapter: {
+    env: 'PARSE_LIVE_QUERY_SERVER_WSS_ADAPTER',
+    help: 'Adapter module for the WebSocketServer',
+    action: parsers.moduleOrObjectParser,
   },
 };

@@ -131,6 +131,11 @@ const defaultColumns: { [string]: SchemaFields } = Object.freeze({
   _GlobalConfig: {
     objectId: { type: 'String' },
     params: { type: 'Object' },
+    masterKeyOnly: { type: 'Object' },
+  },
+  _GraphQLConfig: {
+    objectId: { type: 'String' },
+    config: { type: 'Object' },
   },
   _Audience: {
     objectId: { type: 'String' },
@@ -163,6 +168,7 @@ const volatileClasses = Object.freeze([
   '_PushStatus',
   '_Hooks',
   '_GlobalConfig',
+  '_GraphQLConfig',
   '_JobSchedule',
   '_Audience',
 ]);
@@ -171,6 +177,8 @@ const volatileClasses = Object.freeze([
 const userIdRegex = /^[a-zA-Z0-9]{10}$/;
 // Anything that start with role
 const roleRegex = /^role:.*/;
+// Anything that starts with userField
+const pointerPermissionRegex = /^userField:.*/;
 // * permission
 const publicRegex = /^\*$/;
 
@@ -179,6 +187,7 @@ const requireAuthenticationRegex = /^requiresAuthentication$/;
 const permissionKeyRegex = Object.freeze([
   userIdRegex,
   roleRegex,
+  pointerPermissionRegex,
   publicRegex,
   requireAuthenticationRegex,
 ]);
@@ -233,9 +242,12 @@ function validateCLP(perms: ClassLevelPermissions, fields: SchemaFields) {
       } else {
         perms[operation].forEach(key => {
           if (
-            !fields[key] ||
-            fields[key].type != 'Pointer' ||
-            fields[key].targetClass != '_User'
+            !(
+              fields[key] &&
+              ((fields[key].type == 'Pointer' &&
+                fields[key].targetClass == '_User') ||
+                fields[key].type == 'Array')
+            )
           ) {
             throw new Parse.Error(
               Parse.Error.INVALID_JSON,
@@ -475,6 +487,10 @@ const _GlobalConfigSchema = {
   className: '_GlobalConfig',
   fields: defaultColumns._GlobalConfig,
 };
+const _GraphQLConfigSchema = {
+  className: '_GraphQLConfig',
+  fields: defaultColumns._GraphQLConfig,
+};
 const _PushStatusSchema = convertSchemaToAdapterSchema(
   injectDefaultSchema({
     className: '_PushStatus',
@@ -509,6 +525,7 @@ const VolatileClassesSchemas = [
   _JobScheduleSchema,
   _PushStatusSchema,
   _GlobalConfigSchema,
+  _GraphQLConfigSchema,
   _AudienceSchema,
 ];
 
@@ -654,6 +671,13 @@ export default class SchemaController {
       classLevelPermissions
     );
     if (validationError) {
+      if (validationError instanceof Parse.Error) {
+        return Promise.reject(validationError);
+      } else if (validationError.code && validationError.error) {
+        return Promise.reject(
+          new Parse.Error(validationError.code, validationError.error)
+        );
+      }
       return Promise.reject(validationError);
     }
 
@@ -751,7 +775,11 @@ export default class SchemaController {
             })
             .then(results => {
               enforceFields = results.filter(result => !!result);
-              this.setPermissions(className, classLevelPermissions, newSchema);
+              return this.setPermissions(
+                className,
+                classLevelPermissions,
+                newSchema
+              );
             })
             .then(() =>
               this._dbAdapter.setIndexesWithSchemaFormat(
@@ -874,8 +902,42 @@ export default class SchemaController {
             error: 'field ' + fieldName + ' cannot be added',
           };
         }
-        const error = fieldTypeIsInvalid(fields[fieldName]);
+        const fieldType = fields[fieldName];
+        const error = fieldTypeIsInvalid(fieldType);
         if (error) return { code: error.code, error: error.message };
+        if (fieldType.defaultValue !== undefined) {
+          let defaultValueType = getType(fieldType.defaultValue);
+          if (typeof defaultValueType === 'string') {
+            defaultValueType = { type: defaultValueType };
+          } else if (
+            typeof defaultValueType === 'object' &&
+            fieldType.type === 'Relation'
+          ) {
+            return {
+              code: Parse.Error.INCORRECT_TYPE,
+              error: `The 'default value' option is not applicable for ${typeToString(
+                fieldType
+              )}`,
+            };
+          }
+          if (!dbTypeMatchesObjectType(fieldType, defaultValueType)) {
+            return {
+              code: Parse.Error.INCORRECT_TYPE,
+              error: `schema mismatch for ${className}.${fieldName} default value; expected ${typeToString(
+                fieldType
+              )} but got ${typeToString(defaultValueType)}`,
+            };
+          }
+        } else if (fieldType.required) {
+          if (typeof fieldType === 'object' && fieldType.type === 'Relation') {
+            return {
+              code: Parse.Error.INCORRECT_TYPE,
+              error: `The 'required' option is not applicable for ${typeToString(
+                fieldType
+              )}`,
+            };
+          }
+        }
       }
     }
 
@@ -937,7 +999,22 @@ export default class SchemaController {
 
     const expectedType = this.getExpectedType(className, fieldName);
     if (typeof type === 'string') {
-      type = { type };
+      type = ({ type }: SchemaField);
+    }
+
+    if (type.defaultValue !== undefined) {
+      let defaultValueType = getType(type.defaultValue);
+      if (typeof defaultValueType === 'string') {
+        defaultValueType = { type: defaultValueType };
+      }
+      if (!dbTypeMatchesObjectType(type, defaultValueType)) {
+        throw new Parse.Error(
+          Parse.Error.INCORRECT_TYPE,
+          `schema mismatch for ${className}.${fieldName} default value; expected ${typeToString(
+            type
+          )} but got ${typeToString(defaultValueType)}`
+        );
+      }
     }
 
     if (expectedType) {

@@ -169,11 +169,12 @@ describe_only(() => {
 describe_only(() => {
   return process.env.PARSE_SERVER_TEST_CACHE === 'redis';
 })('Redis Performance', function() {
-  const cacheAdapter = new RedisCacheAdapter();
+  let cacheAdapter;
   let getSpy;
   let putSpy;
 
   beforeEach(async () => {
+    cacheAdapter = new RedisCacheAdapter();
     await cacheAdapter.clear();
     await reconfigureServer({
       cacheAdapter,
@@ -187,7 +188,7 @@ describe_only(() => {
     const object = new TestObject();
     object.set('foo', 'bar');
     await object.save();
-    expect(getSpy.calls.count()).toBe(2);
+    expect(getSpy.calls.count()).toBe(3);
     expect(putSpy.calls.count()).toBe(2);
   });
 
@@ -200,7 +201,7 @@ describe_only(() => {
       booleanField: true,
     });
     await container.save();
-    expect(getSpy.calls.count()).toBe(2);
+    expect(getSpy.calls.count()).toBe(3);
     expect(putSpy.calls.count()).toBe(2);
   });
 
@@ -214,7 +215,7 @@ describe_only(() => {
 
     object.set('foo', 'barz');
     await object.save();
-    expect(getSpy.calls.count()).toBe(2);
+    expect(getSpy.calls.count()).toBe(3);
     expect(putSpy.calls.count()).toBe(0);
   });
 
@@ -232,7 +233,7 @@ describe_only(() => {
       objects.push(object);
     }
     await Parse.Object.saveAll(objects);
-    expect(getSpy.calls.count()).toBe(11);
+    expect(getSpy.calls.count()).toBe(21);
     expect(putSpy.calls.count()).toBe(10);
 
     getSpy.calls.reset();
@@ -257,7 +258,7 @@ describe_only(() => {
       objects.push(object);
     }
     await Parse.Object.saveAll(objects, { batchSize: 5 });
-    expect(getSpy.calls.count()).toBe(12);
+    expect(getSpy.calls.count()).toBe(22);
     expect(putSpy.calls.count()).toBe(5);
 
     getSpy.calls.reset();
@@ -278,7 +279,7 @@ describe_only(() => {
 
     object.set('new', 'barz');
     await object.save();
-    expect(getSpy.calls.count()).toBe(2);
+    expect(getSpy.calls.count()).toBe(3);
     expect(putSpy.calls.count()).toBe(1);
   });
 
@@ -298,7 +299,7 @@ describe_only(() => {
       booleanField: true,
     });
     await object.save();
-    expect(getSpy.calls.count()).toBe(2);
+    expect(getSpy.calls.count()).toBe(3);
     expect(putSpy.calls.count()).toBe(1);
   });
 
@@ -308,7 +309,7 @@ describe_only(() => {
     user.setPassword('testing');
     await user.signUp();
 
-    expect(getSpy.calls.count()).toBe(6);
+    expect(getSpy.calls.count()).toBe(8);
     expect(putSpy.calls.count()).toBe(1);
   });
 
@@ -325,7 +326,7 @@ describe_only(() => {
 
     object.set('foo', 'bar');
     await object.save();
-    expect(getSpy.calls.count()).toBe(3);
+    expect(getSpy.calls.count()).toBe(4);
     expect(putSpy.calls.count()).toBe(1);
 
     getSpy.calls.reset();

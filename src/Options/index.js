@@ -5,6 +5,7 @@ import { StorageAdapter } from '../Adapters/Storage/StorageAdapter';
 import { CacheAdapter } from '../Adapters/Cache/CacheAdapter';
 import { MailAdapter } from '../Adapters/Email/MailAdapter';
 import { PubSubAdapter } from '../Adapters/PubSub/PubSubAdapter';
+import { WSSAdapter } from '../Adapters/WebSocketServer/WSSAdapter';
 
 // @flow
 type Adapter<T> = string | any | T;
@@ -180,6 +181,8 @@ export interface ParseServerOptions {
   startLiveQueryServer: ?boolean;
   /* Live query server configuration options (will start the liveQuery server) */
   liveQueryServerOptions: ?LiveQueryServerOptions;
+  /* Full path to your GraphQL custom schema.graphql file */
+  graphQLSchema: ?string;
   /* Mounts the GraphQL endpoint
   :ENV: PARSE_SERVER_MOUNT_GRAPHQL
   :DEFAULT: false */
@@ -196,8 +199,10 @@ export interface ParseServerOptions {
   :ENV: PARSE_SERVER_PLAYGROUND_PATH
   :DEFAULT: /playground */
   playgroundPath: ?string;
-
+  /* Callback when server has started */
   serverStartComplete: ?(error: ?Error) => void;
+  /* Callback when server has closed */
+  serverCloseComplete: ?() => void;
 }
 
 export interface CustomPagesOptions {
@@ -229,6 +234,8 @@ export interface LiveQueryOptions {
   redisURL: ?string;
   /* LiveQuery pubsub adapter */
   pubSubAdapter: ?Adapter<PubSubAdapter>;
+  /* Adapter module for the WebSocketServer */
+  wssAdapter: ?Adapter<WSSAdapter>;
 }
 
 export interface LiveQueryServerOptions {
@@ -255,4 +262,6 @@ export interface LiveQueryServerOptions {
   redisURL: ?string;
   /* LiveQuery pubsub adapter */
   pubSubAdapter: ?Adapter<PubSubAdapter>;
+  /* Adapter module for the WebSocketServer */
+  wssAdapter: ?Adapter<WSSAdapter>;
 }

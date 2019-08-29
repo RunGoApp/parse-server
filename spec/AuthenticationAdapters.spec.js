@@ -13,6 +13,7 @@ const responses = {
   wechat: { errcode: 0 },
   weibo: { uid: 'userId' },
   qq: 'callback( {"openid":"userId"} );', // yes it's like that, run eval in the client :P
+  phantauth: { sub: 'userId' },
 };
 
 describe('AuthenticationProviders', function() {
@@ -33,6 +34,7 @@ describe('AuthenticationProviders', function() {
     'spotify',
     'wechat',
     'weibo',
+    'phantauth',
   ].map(function(providerName) {
     it('Should validate structure of ' + providerName, done => {
       const provider = require('../lib/Adapters/Auth/' + providerName);
@@ -1102,7 +1104,7 @@ describe('apple signin auth adapter', () => {
   it('should not verify invalid id_token', async () => {
     try {
       await apple.validateAuthData(
-        { id: 'the_token' },
+        { id: 'the_user_id', token: 'the_token' },
         { client_id: 'secret' }
       );
       fail();
@@ -1116,11 +1118,12 @@ describe('apple signin auth adapter', () => {
       iss: 'https://appleid.apple.com',
       aud: 'secret',
       exp: Date.now(),
+      sub: 'the_user_id',
     };
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     const result = await apple.validateAuthData(
-      { id: 'the_token' },
+      { id: 'the_user_id', token: 'the_token' },
       { client_id: 'secret' }
     );
     expect(result).toEqual(fakeClaim);
@@ -1129,12 +1132,13 @@ describe('apple signin auth adapter', () => {
   it('should throw error with with invalid jwt issuer', async () => {
     const fakeClaim = {
       iss: 'https://not.apple.com',
+      sub: 'the_user_id',
     };
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
       await apple.validateAuthData(
-        { id: 'the_token' },
+        { id: 'the_user_id', token: 'the_token' },
         { client_id: 'secret' }
       );
       fail();
@@ -1149,12 +1153,13 @@ describe('apple signin auth adapter', () => {
     const fakeClaim = {
       iss: 'https://appleid.apple.com',
       aud: 'invalid_client_id',
+      sub: 'the_user_id',
     };
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
       await apple.validateAuthData(
-        { id: 'the_token' },
+        { id: 'the_user_id', token: 'the_token' },
         { client_id: 'secret' }
       );
       fail();
@@ -1162,6 +1167,28 @@ describe('apple signin auth adapter', () => {
       expect(e.message).toBe(
         'jwt aud parameter does not include this client - is: invalid_client_id | expected: secret'
       );
+    }
+  });
+});
+
+describe('phant auth adapter', () => {
+  const httpsRequest = require('../lib/Adapters/Auth/httpsRequest');
+
+  it('validateAuthData should throw for invalid auth', async () => {
+    const authData = {
+      id: 'fakeid',
+      access_token: 'sometoken',
+    };
+    const { adapter } = authenticationLoader.loadAuthAdapter('phantauth', {});
+
+    spyOn(httpsRequest, 'get').and.callFake(() =>
+      Promise.resolve({ sub: 'invalidID' })
+    );
+    try {
+      await adapter.validateAuthData(authData);
+      fail();
+    } catch (e) {
+      expect(e.message).toBe('PhantAuth auth is invalid for this user.');
     }
   });
 });

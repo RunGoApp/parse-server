@@ -105,9 +105,6 @@
     "prepare": "npm run build",
     "postinstall": "node -p 'require(\"./postinstall.js\")()'"
   },
-  "engines": {
-    "node": ">= 8"
-  },
   "bin": {
     "parse-server": "./bin/parse-server"
   },

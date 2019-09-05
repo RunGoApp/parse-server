@@ -38,9 +38,6 @@ const verifyIdToken = async (token, clientIDs) => {
     algorithms: 'RS256',
   });
 
-  console.log('JWT Claims', jwtClaims);
-  console.log(typeof jwtClaims);
-
   if (jwtClaims.iss !== TOKEN_ISSUER) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
@@ -48,8 +45,6 @@ const verifyIdToken = async (token, clientIDs) => {
     );
   }
 
-  console.log(clientIDs);
-  console.log(clientIDs.includes(jwtClaims.aud));
   if (
     typeof clientIDs !== 'undefined' &&
     clientIDs &&

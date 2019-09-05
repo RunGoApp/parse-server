@@ -25,7 +25,7 @@ const getApplePublicKey = async () => {
 };
 
 // swap id & token
-const verifyIdToken = async (token, clientID) => {
+const verifyIdToken = async (token, clientIDs) => {
   if (!token) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
@@ -46,10 +46,14 @@ const verifyIdToken = async (token, clientID) => {
       );
     }
 
-    if (clientID !== undefined && jwtClaims.aud !== clientID) {
+    if (
+      typeof clientIDs !== 'undefined' &&
+      clientIDs &&
+      clientIDs.includes(jwtClaims.aud)
+    ) {
       throw new Parse.Error(
         Parse.Error.OBJECT_NOT_FOUND,
-        `jwt aud parameter does not include this client - is: ${jwtClaims.aud} | expected: ${clientID}`
+        `jwt aud parameter does not include this client - is: ${jwtClaims.aud} | expected: ${clientIDs}`
       );
     }
 
@@ -65,7 +69,7 @@ const verifyIdToken = async (token, clientID) => {
 }; // Returns a promise that fulfills if this id token is valid
 
 function validateAuthData(authData, options = {}) {
-  return verifyIdToken(authData.id, options.client_id);
+  return verifyIdToken(authData.id, options.client_ids);
 } // Returns a promise that fulfills if this app id is valid.
 
 function validateAppId() {

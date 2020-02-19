@@ -118,9 +118,14 @@ const verifyIdToken = async ({ token, id }, clientID) => {
     );
   }
 
+  console.log("typeof", typeof jwtClaims.aud);
+  for (let id of clientID) {
+    console.log("id", id, "type of", typeof id);
+  }
   if (!clientID.includes(jwtClaims.aud)) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
+      // 'jwt aud parameter does not include this client - is: com.rungoapp.dev | expected: com.rungoapp.dev,com.leapingcoyote.rungo.watchkitapp.watchkitextension,com.leapingcoyote.rungo' }
       `jwt aud parameter does not include this client - is: ${jwtClaims.aud} | expected: ${clientID}`
     );
   }

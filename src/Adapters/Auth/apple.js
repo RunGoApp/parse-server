@@ -41,7 +41,7 @@ const verifyIdToken = async ({ token, id }, clientID) => {
   }
   const applePublicKey = await getApplePublicKey();
   const jwtClaims = jwt.verify(token, applePublicKey, { algorithms: 'RS256' });
-
+  
   if (jwtClaims.iss !== TOKEN_ISSUER) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,

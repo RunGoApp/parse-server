@@ -121,7 +121,7 @@ const verifyIdToken = async ({ token, id }, clientID) => {
   if (!clientID.includes(jwtClaims.aud)) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
-      `jwt aud parameter does not include this client - is: ${jwtClaims.aud} | expected: ${clientID}. ${typeof jwtClaims.aud}, ${typeof clientID}`
+      `jwt aud parameter does not include this client - is: ${jwtClaims.aud} | expected: ${clientID}`
     );
   }
   return jwtClaims;

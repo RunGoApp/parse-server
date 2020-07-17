@@ -1,42 +1,42 @@
-var ParseWebSocket = require('../src/LiveQuery/ParseWebSocketServer').ParseWebSocket;
+const ParseWebSocket = require('../lib/LiveQuery/ParseWebSocketServer')
+  .ParseWebSocket;
 
 describe('ParseWebSocket', function() {
-
   it('can be initialized', function() {
-    var ws = {};
-    var parseWebSocket = new ParseWebSocket(ws);
+    const ws = {};
+    const parseWebSocket = new ParseWebSocket(ws);
 
     expect(parseWebSocket.ws).toBe(ws);
   });
 
-  it('can handle events defined in typeMap', function() {
-    var ws = {
-      on: jasmine.createSpy('on')
+  it('can handle disconnect event', function(done) {
+    const ws = {
+      onclose: () => {},
     };
-    var callback = {};
-    var parseWebSocket = new ParseWebSocket(ws);
-    parseWebSocket.on('disconnect', callback);
-
-    expect(parseWebSocket.ws.on).toHaveBeenCalledWith('close', callback);
+    const parseWebSocket = new ParseWebSocket(ws);
+    parseWebSocket.on('disconnect', () => {
+      done();
+    });
+    ws.onclose();
   });
 
-  it('can handle events which are not defined in typeMap', function() {
-    var ws = {
-      on: jasmine.createSpy('on')
+  it('can handle message event', function(done) {
+    const ws = {
+      onmessage: () => {},
     };
-    var callback = {};
-    var parseWebSocket = new ParseWebSocket(ws);
-    parseWebSocket.on('open', callback);
-
-    expect(parseWebSocket.ws.on).toHaveBeenCalledWith('open', callback);
+    const parseWebSocket = new ParseWebSocket(ws);
+    parseWebSocket.on('message', () => {
+      done();
+    });
+    ws.onmessage();
   });
 
   it('can send a message', function() {
-    var ws = {
-      send: jasmine.createSpy('send')
+    const ws = {
+      send: jasmine.createSpy('send'),
     };
-    var parseWebSocket = new ParseWebSocket(ws);
-    parseWebSocket.send('message')
+    const parseWebSocket = new ParseWebSocket(ws);
+    parseWebSocket.send('message');
 
     expect(parseWebSocket.ws.send).toHaveBeenCalledWith('message');
   });

@@ -2,50 +2,36 @@
 // https://developer.apple.com/documentation/signinwithapplerestapi
 
 const Parse = require('parse/node').Parse;
-const httpsRequest = require('./httpsRequest');
-const NodeRSA = require('node-rsa');
+const jwksClient = require('jwks-rsa');
+const util = require('util');
 const jwt = require('jsonwebtoken');
 
 const TOKEN_ISSUER = 'https://appleid.apple.com';
 
-let currentKey;
+const getAppleKeyByKeyId = async (keyId, cacheMaxEntries, cacheMaxAge) => {
+  const client = jwksClient({
+    jwksUri: `${TOKEN_ISSUER}/auth/keys`,
+    cache: true,
+    cacheMaxEntries,
+    cacheMaxAge,
+  });
 
-const getApplePublicKey = async keyID => {
-  let data;
+  const asyncGetSigningKeyFunction = util.promisify(client.getSigningKey);
+
+  let key;
   try {
-    data = await httpsRequest.get('https://appleid.apple.com/auth/keys');
-  } catch (e) {
-    if (currentKey) {
-      return currentKey;
-    }
-    throw e;
-  }
-
-  const key = data.keys.find(key => key.kid === keyID);
-
-  if (!key) {
+    key = await asyncGetSigningKeyFunction(keyId);
+  } catch (error) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
-      `Public key with matching key ID to token not found`
+      `Unable to find matching key for Key ID: ${keyId}`
     );
   }
-
-  const pubKey = new NodeRSA();  
-  pubKey.importKey(
-    { n: Buffer.from(key.n, 'base64'), e: Buffer.from(key.e, 'base64') },
-    'components-public'
-  );
-  
-  currentKey = pubKey.exportKey(['public']);
-  return currentKey;
+  return key;
 };
 
-const getKeyAndAlgoFromToken = token => {
-  const decodedToken = jwt.decode(token,
-    {
-      complete: true
-    }
-  );
+const getHeaderFromToken = token => {
+  const decodedToken = jwt.decode(token, { complete: true });
   if (!decodedToken) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
@@ -53,30 +39,43 @@ const getKeyAndAlgoFromToken = token => {
     );
   }
 
-  const keyID = decodedToken.header.kid;
-  const algo = decodedToken.header.alg;
+  return decodedToken.header;
+};
 
-  return { keyID, algo };
-}
-
-const verifyIdToken = async ({ token, id }, clientID) => {
+const verifyIdToken = async (
+  { token, id },
+  { clientId, cacheMaxEntries, cacheMaxAge }
+) => {
   if (!token) {
     throw new Parse.Error(
       Parse.Error.OBJECT_NOT_FOUND,
-      'id token is invalid for this user.'
+      `id token is invalid for this user.`
     );
   }
 
-  const decodedToken = getKeyAndAlgoFromToken(token);
-  const applePublicKey = await getApplePublicKey(decodedToken.keyID);
+  const { kid: keyId, alg: algorithm } = getHeaderFromToken(token);
+  const ONE_HOUR_IN_MS = 3600000;
   let jwtClaims;
-  
+
+  cacheMaxAge = cacheMaxAge || ONE_HOUR_IN_MS;
+  cacheMaxEntries = cacheMaxEntries || 5;
+
+  const appleKey = await getAppleKeyByKeyId(
+    keyId,
+    cacheMaxEntries,
+    cacheMaxAge
+  );
+  const signingKey = appleKey.publicKey || appleKey.rsaPublicKey;
+
   try {
-    jwtClaims = jwt.verify(token, applePublicKey, {
-      algorithms: decodedToken.algo,
+    jwtClaims = jwt.verify(token, signingKey, {
+      algorithms: algorithm,
+      // the audience can be checked against a string, a regular expression or a list of strings and/or regular expressions.
+      audience: clientId,
     });
   } catch (exception) {
     const message = exception.message;
+
     throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `${message}`);
   }
 
@@ -93,43 +92,12 @@ const verifyIdToken = async ({ token, id }, clientID) => {
       `auth data is invalid for this user.`
     );
   }
-
-  if (!clientID) {
-    throw new Parse.Error(
-      Parse.Error.OBJECT_NOT_FOUND,
-      `client ids do not exist`
-    );
-  }
-
-  if (typeof clientID === "string")
-    clientID = [clientID];
-
-  if (!Array.isArray(clientID)) {
-    throw new Parse.Error(
-      Parse.Error.OBJECT_NOT_FOUND,
-      `invalid client id type provided, either string or array`
-    );
-  }
-
-  if (clientID.length === 0) {
-    throw new Parse.Error(
-      Parse.Error.OBJECT_NOT_FOUND,
-      `need at least one client id, empty array provided`
-    );
-  }
-
-  if (!clientID.includes(jwtClaims.aud)) {
-    throw new Parse.Error(
-      Parse.Error.OBJECT_NOT_FOUND,
-      `jwt aud parameter does not include this client - is: ${jwtClaims.aud} | expected: ${clientID}`
-    );
-  }
   return jwtClaims;
 };
 
 // Returns a promise that fulfills if this id token is valid
 function validateAuthData(authData, options = {}) {
-  return verifyIdToken(authData, options.client_id);
+  return verifyIdToken(authData, options);
 }
 
 // Returns a promise that fulfills if this app id is valid.

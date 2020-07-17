@@ -1,15 +1,15 @@
 function numberParser(key) {
-  return function(opt) {
+  return function (opt) {
     const intOpt = parseInt(opt);
     if (!Number.isInteger(intOpt)) {
       throw new Error(`Key ${key} has invalid value ${opt}`);
     }
     return intOpt;
-  }
+  };
 }
 
 function numberOrBoolParser(key) {
-  return function(opt) {
+  return function (opt) {
     if (typeof opt === 'boolean') {
       return opt;
     }
@@ -20,14 +20,14 @@ function numberOrBoolParser(key) {
       return false;
     }
     return numberParser(key)(opt);
-  }
+  };
 }
 
 function objectParser(opt) {
   if (typeof opt == 'object') {
     return opt;
   }
-  return JSON.parse(opt)
+  return JSON.parse(opt);
 }
 
 function arrayParser(opt) {
@@ -41,12 +41,14 @@ function arrayParser(opt) {
 }
 
 function moduleOrObjectParser(opt) {
-  if (typeof opt == 'object')  {
+  if (typeof opt == 'object') {
     return opt;
   }
   try {
     return JSON.parse(opt);
-  } catch(e) { /* */ }
+  } catch (e) {
+    /* */
+  }
   return opt;
 }
 
@@ -71,5 +73,5 @@ module.exports = {
   booleanParser,
   moduleOrObjectParser,
   arrayParser,
-  objectParser
+  objectParser,
 };

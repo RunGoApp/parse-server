@@ -1,11 +1,7 @@
-"use strict"
+'use strict';
 // Sets up a Parse API server for testing.
-const SpecReporter = require('jasmine-spec-reporter').SpecReporter;
-
-jasmine.DEFAULT_TIMEOUT_INTERVAL = process.env.PARSE_SERVER_TEST_TIMEOUT || 5000;
-
-jasmine.getEnv().clearReporters();
-jasmine.getEnv().addReporter(new SpecReporter());
+jasmine.DEFAULT_TIMEOUT_INTERVAL =
+  process.env.PARSE_SERVER_TEST_TIMEOUT || 5000;
 
 global.on_db = (db, callback, elseCallback) => {
   if (process.env.PARSE_SERVER_TEST_DB == db) {
@@ -16,30 +12,34 @@ global.on_db = (db, callback, elseCallback) => {
   if (elseCallback) {
     return elseCallback();
   }
-}
+};
 
 if (global._babelPolyfill) {
   console.error('We should not use polyfilled tests');
   process.exit(1);
 }
+process.noDeprecation = true;
 
-var cache = require('../src/cache').default;
-var ParseServer = require('../src/index').ParseServer;
-var path = require('path');
-var TestUtils = require('../src/TestUtils');
-const GridStoreAdapter = require('../src/Adapters/Files/GridStoreAdapter').GridStoreAdapter;
+const cache = require('../lib/cache').default;
+const ParseServer = require('../lib/index').ParseServer;
+const path = require('path');
+const TestUtils = require('../lib/TestUtils');
+const GridFSBucketAdapter = require('../lib/Adapters/Files/GridFSBucketAdapter')
+  .GridFSBucketAdapter;
 const FSAdapter = require('@parse/fs-files-adapter');
-import PostgresStorageAdapter from '../src/Adapters/Storage/Postgres/PostgresStorageAdapter';
-import MongoStorageAdapter from '../src/Adapters/Storage/Mongo/MongoStorageAdapter';
-const RedisCacheAdapter = require('../src/Adapters/Cache/RedisCacheAdapter').default;
+const PostgresStorageAdapter = require('../lib/Adapters/Storage/Postgres/PostgresStorageAdapter')
+  .default;
+const MongoStorageAdapter = require('../lib/Adapters/Storage/Mongo/MongoStorageAdapter')
+  .default;
+const RedisCacheAdapter = require('../lib/Adapters/Cache/RedisCacheAdapter')
+  .default;
 
-const mongoURI = 'mongodb://localhost:27017/parseServerMongoAdapterTestDatabase';
-const postgresURI = 'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
+const mongoURI =
+  'mongodb://localhost:27017/parseServerMongoAdapterTestDatabase';
+const postgresURI =
+  'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
 let databaseAdapter;
 // need to bind for mocking mocha
-
-let startDB = () => {};
-let stopDB = () => {};
 
 if (process.env.PARSE_SERVER_TEST_DB === 'postgres') {
   databaseAdapter = new PostgresStorageAdapter({
@@ -47,26 +47,25 @@ if (process.env.PARSE_SERVER_TEST_DB === 'postgres') {
     collectionPrefix: 'test_',
   });
 } else {
-  startDB = require('mongodb-runner/mocha/before').bind({
-    timeout: () => {},
-    slow: () => {}
-  })
-  stopDB = require('mongodb-runner/mocha/after');
   databaseAdapter = new MongoStorageAdapter({
     uri: mongoURI,
     collectionPrefix: 'test_',
   });
 }
 
-var port = 8378;
+const port = 8378;
 
 let filesAdapter;
 
-on_db('mongo', () => {
-  filesAdapter = new GridStoreAdapter(mongoURI);
-}, () => {
-  filesAdapter = new FSAdapter();
-});
+on_db(
+  'mongo',
+  () => {
+    filesAdapter = new GridFSBucketAdapter(mongoURI);
+  },
+  () => {
+    filesAdapter = new FSAdapter();
+  }
+);
 
 let logLevel;
 let silent = true;
@@ -79,7 +78,7 @@ if (process.env.PARSE_SERVER_LOG_LEVEL) {
   logLevel = process.env.PARSE_SERVER_LOG_LEVEL;
 }
 // Default server configuration for tests.
-var defaultConfiguration = {
+const defaultConfiguration = {
   filesAdapter,
   serverURL: 'http://localhost:' + port + '/1',
   databaseAdapter,
@@ -98,15 +97,17 @@ var defaultConfiguration = {
     android: {
       senderId: 'yolo',
       apiKey: 'yolo',
-    }
+    },
   },
-  auth: { // Override the facebook provider
+  auth: {
+    // Override the facebook provider
+    custom: mockCustom(),
     facebook: mockFacebook(),
     myoauth: {
-      module: path.resolve(__dirname, "myoauth") // relative path as it's run from src
+      module: path.resolve(__dirname, 'myoauth'), // relative path as it's run from src
     },
-    shortLivedAuth: mockShortLivedAuth()
-  }
+    shortLivedAuth: mockShortLivedAuth(),
+  },
 };
 
 if (process.env.PARSE_SERVER_TEST_CACHE === 'redis') {
@@ -114,9 +115,8 @@ if (process.env.PARSE_SERVER_TEST_CACHE === 'redis') {
 }
 
 const openConnections = {};
-
 // Set up a default API server for testing with default configuration.
-var server;
+let server;
 
 // Allows testing specific configurations of Parse Server
 const reconfigureServer = changedConfiguration => {
@@ -128,15 +128,27 @@ const reconfigureServer = changedConfiguration => {
       });
     }
     try {
-      const newConfiguration = Object.assign({}, defaultConfiguration, changedConfiguration, {
-        __indexBuildCompletionCallbackForTests: indexBuildPromise => indexBuildPromise.then(resolve, reject),
-        mountPath: '/1',
-        port,
-      });
+      let parseServer = undefined;
+      const newConfiguration = Object.assign(
+        {},
+        defaultConfiguration,
+        changedConfiguration,
+        {
+          serverStartComplete: error => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(parseServer);
+            }
+          },
+          mountPath: '/1',
+          port,
+        }
+      );
       cache.clear();
-      const parseServer = ParseServer.start(newConfiguration);
+      parseServer = ParseServer.start(newConfiguration);
       parseServer.app.use(require('./testing-routes').router);
-      parseServer.expressApp.use('/1', (err) => {
+      parseServer.expressApp.use('/1', err => {
         console.error(err);
         fail('should not call next');
       });
@@ -144,26 +156,19 @@ const reconfigureServer = changedConfiguration => {
       server.on('connection', connection => {
         const key = `${connection.remoteAddress}:${connection.remotePort}`;
         openConnections[key] = connection;
-        connection.on('close', () => { delete openConnections[key] });
+        connection.on('close', () => {
+          delete openConnections[key];
+        });
       });
-    } catch(error) {
+    } catch (error) {
       reject(error);
     }
   });
-}
+};
 
 // Set up a Parse client to talk to our test API server
-var Parse = require('parse/node');
+const Parse = require('parse/node');
 Parse.serverURL = 'http://localhost:' + port + '/1';
-
-// This is needed because we ported a bunch of tests from the non-A+ way.
-// TODO: update tests to work in an A+ way
-Parse.Promise.disableAPlusCompliant();
-
-// 10 minutes timeout
-beforeAll(startDB, 10 * 60 * 1000);
-
-afterAll(stopDB);
 
 beforeEach(done => {
   try {
@@ -173,10 +178,13 @@ beforeEach(done => {
       throw error;
     }
   }
-  TestUtils.destroyAllDataPermanently()
+  TestUtils.destroyAllDataPermanently(true)
     .catch(error => {
-    // For tests that connect to their own mongo, there won't be any data to delete.
-      if (error.message === 'ns not found' || error.message.startsWith('connect ECONNREFUSED')) {
+      // For tests that connect to their own mongo, there won't be any data to delete.
+      if (
+        error.message === 'ns not found' ||
+        error.message.startsWith('connect ECONNREFUSED')
+      ) {
         return;
       } else {
         fail(error);
@@ -188,72 +196,83 @@ beforeEach(done => {
       Parse.initialize('test', 'test', 'test');
       Parse.serverURL = 'http://localhost:' + port + '/1';
       done();
-    }).catch(done.fail);
+    })
+    .catch(done.fail);
 });
 
 afterEach(function(done) {
   const afterLogOut = () => {
     if (Object.keys(openConnections).length > 0) {
-      fail('There were open connections to the server left after the test finished');
+      fail(
+        'There were open connections to the server left after the test finished'
+      );
     }
-    on_db('postgres', () => {
-      TestUtils.destroyAllDataPermanently().then(done, done);
-    }, done);
+    TestUtils.destroyAllDataPermanently(true).then(done, done);
   };
   Parse.Cloud._removeAllHooks();
-  databaseAdapter.getAllClasses()
+  databaseAdapter
+    .getAllClasses()
     .then(allSchemas => {
-      allSchemas.forEach((schema) => {
-        var className = schema.className;
-        expect(className).toEqual({ asymmetricMatch: className => {
-          if (!className.startsWith('_')) {
-            return true;
-          } else {
-          // Other system classes will break Parse.com, so make sure that we don't save anything to _SCHEMA that will
-          // break it.
-            return ['_User', '_Installation', '_Role', '_Session', '_Product', '_Audience'].indexOf(className) >= 0;
-          }
-        }});
+      allSchemas.forEach(schema => {
+        const className = schema.className;
+        expect(className).toEqual({
+          asymmetricMatch: className => {
+            if (!className.startsWith('_')) {
+              return true;
+            } else {
+              // Other system classes will break Parse.com, so make sure that we don't save anything to _SCHEMA that will
+              // break it.
+              return (
+                [
+                  '_User',
+                  '_Installation',
+                  '_Role',
+                  '_Session',
+                  '_Product',
+                  '_Audience',
+                  '_Idempotency'
+                ].indexOf(className) >= 0
+              );
+            }
+          },
+        });
       });
     })
     .then(() => Parse.User.logOut())
-    .then(afterLogOut, afterLogOut)
+    .then(
+      () => {},
+      () => {}
+    ) // swallow errors
+    .then(() => {
+      // Connection close events are not immediate on node 10+... wait a bit
+      return new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    })
+    .then(afterLogOut);
 });
 
-var TestObject = Parse.Object.extend({
-  className: "TestObject"
+const TestObject = Parse.Object.extend({
+  className: 'TestObject',
 });
-var Item = Parse.Object.extend({
-  className: "Item"
+const Item = Parse.Object.extend({
+  className: 'Item',
 });
-var Container = Parse.Object.extend({
-  className: "Container"
+const Container = Parse.Object.extend({
+  className: 'Container',
 });
 
 // Convenience method to create a new TestObject with a callback
 function create(options, callback) {
-  var t = new TestObject(options);
-  t.save(null, { success: callback });
+  const t = new TestObject(options);
+  return t.save().then(callback);
 }
 
-function createTestUser(success, error) {
-  var user = new Parse.User();
+function createTestUser() {
+  const user = new Parse.User();
   user.set('username', 'test');
   user.set('password', 'moon-y');
-  var promise = user.signUp();
-  if (success || error) {
-    promise.then(function(user) {
-      if (success) {
-        success(user);
-      }
-    }, function(err) {
-      if (error) {
-        error(err);
-      }
-    });
-  } else {
-    return promise;
-  }
+  return user.signUp();
 }
 
 // Shims for compatibility with the old qunit tests.
@@ -269,35 +288,6 @@ function strictEqual(a, b, message) {
 function notEqual(a, b, message) {
   expect(a).not.toEqual(b, message);
 }
-function expectSuccess(params, done) {
-  return {
-    success: params.success,
-    error: function() {
-      fail('failure happened in expectSuccess');
-      done ? done() : null;
-    },
-  }
-}
-function expectError(errorCode, callback) {
-  return {
-    success: function(result) {
-      console.log('got result', result);
-      fail('expected error but got success');
-    },
-    error: function(obj, e) {
-      // Some methods provide 2 parameters.
-      e = e || obj;
-      if (!e) {
-        fail('expected a specific error but got a blank error');
-        return;
-      }
-      expect(e.code).toEqual(errorCode, e.message);
-      if (callback) {
-        callback(e);
-      }
-    },
-  }
-}
 
 // Because node doesn't have Parse._.contains
 function arrayContains(arr, item) {
@@ -312,8 +302,8 @@ function normalize(obj) {
   if (obj instanceof Array) {
     return '[' + obj.map(normalize).join(', ') + ']';
   }
-  var answer = '{';
-  for (var key of Object.keys(obj).sort()) {
+  let answer = '{';
+  for (const key of Object.keys(obj).sort()) {
     answer += key + ': ';
     answer += normalize(obj[key]);
     answer += ', ';
@@ -328,15 +318,33 @@ function jequal(o1, o2) {
 }
 
 function range(n) {
-  var answer = [];
-  for (var i = 0; i < n; i++) {
+  const answer = [];
+  for (let i = 0; i < n; i++) {
     answer.push(i);
   }
   return answer;
 }
 
+function mockCustomAuthenticator(id, password) {
+  const custom = {};
+  custom.validateAuthData = function(authData) {
+    if (authData.id === id && authData.password.startsWith(password)) {
+      return Promise.resolve();
+    }
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'not validated');
+  };
+  custom.validateAppId = function() {
+    return Promise.resolve();
+  };
+  return custom;
+}
+
+function mockCustom() {
+  return mockCustomAuthenticator('fastrde', 'password');
+}
+
 function mockFacebookAuthenticator(id, token) {
-  var facebook = {};
+  const facebook = {};
   facebook.validateAuthData = function(authData) {
     if (authData.id === id && authData.access_token.startsWith(token)) {
       return Promise.resolve();
@@ -363,7 +371,7 @@ function mockShortLivedAuth() {
   let accessToken;
   auth.setValidAccessToken = function(validAccessToken) {
     accessToken = validAccessToken;
-  }
+  };
   auth.validateAuthData = function(authData) {
     if (authData.access_token == accessToken) {
       return Promise.resolve();
@@ -377,7 +385,6 @@ function mockShortLivedAuth() {
   return auth;
 }
 
-
 // This is polluting, but, it makes it way easier to directly port old tests.
 global.Parse = Parse;
 global.TestObject = TestObject;
@@ -389,17 +396,17 @@ global.ok = ok;
 global.equal = equal;
 global.strictEqual = strictEqual;
 global.notEqual = notEqual;
-global.expectSuccess = expectSuccess;
-global.expectError = expectError;
 global.arrayContains = arrayContains;
 global.jequal = jequal;
 global.range = range;
 global.reconfigureServer = reconfigureServer;
 global.defaultConfiguration = defaultConfiguration;
+global.mockCustomAuthenticator = mockCustomAuthenticator;
 global.mockFacebookAuthenticator = mockFacebookAuthenticator;
+global.databaseAdapter = databaseAdapter;
 global.jfail = function(err) {
   fail(JSON.stringify(err));
-}
+};
 
 global.it_exclude_dbs = excluded => {
   if (excluded.indexOf(process.env.PARSE_SERVER_TEST_DB) >= 0) {
@@ -407,10 +414,13 @@ global.it_exclude_dbs = excluded => {
   } else {
     return it;
   }
-}
+};
 
 global.it_only_db = db => {
-  if (process.env.PARSE_SERVER_TEST_DB === db) {
+  if (
+    process.env.PARSE_SERVER_TEST_DB === db ||
+    (!process.env.PARSE_SERVER_TEST_DB && db == 'mongo')
+  ) {
     return it;
   } else {
     return xit;
@@ -423,7 +433,7 @@ global.fit_exclude_dbs = excluded => {
   } else {
     return fit;
   }
-}
+};
 
 global.describe_only_db = db => {
   if (process.env.PARSE_SERVER_TEST_DB == db) {
@@ -431,11 +441,11 @@ global.describe_only_db = db => {
   } else if (!process.env.PARSE_SERVER_TEST_DB && db == 'mongo') {
     return describe;
   } else {
-    return () => {};
+    return xdescribe;
   }
-}
+};
 
-global.describe_only = (validator) =>{
+global.describe_only = validator => {
   if (validator()) {
     return describe;
   } else {
@@ -443,20 +453,19 @@ global.describe_only = (validator) =>{
   }
 };
 
-
-var libraryCache = {};
+const libraryCache = {};
 jasmine.mockLibrary = function(library, name, mock) {
-  var original = require(library)[name];
+  const original = require(library)[name];
   if (!libraryCache[library]) {
     libraryCache[library] = {};
   }
   require(library)[name] = mock;
   libraryCache[library][name] = original;
-}
+};
 
 jasmine.restoreLibrary = function(library, name) {
   if (!libraryCache[library] || !libraryCache[library][name]) {
     throw 'Can not find library ' + library + ' ' + name;
   }
   require(library)[name] = libraryCache[library][name];
-}
+};

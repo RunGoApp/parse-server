@@ -1,4 +1,17 @@
-We use GitHub Issues for bugs.
+---
+name: "\U0001F4F2 Push Notifications"
+about: Issues with setting up or delivering push notifications
+title: ''
+labels: ''
+assignees: ''
+
+---
+
+<!--- 
+
+**We use GitHub Issues for reporting bugs with parse-server.**
+
+If you have a *question*, you should join the [Parse Community's Discourse forum](https://community.parseplatform.org/c/parse-server)
 
 If you have a non-bug question, ask on Stack Overflow or Server Fault: 
 - https://stackoverflow.com/questions/tagged/parse.com 
@@ -9,22 +22,15 @@ If you have a vulnerability disclosure, please follow our policy available here 
 You may also search through existing issues before opening a new one: https://github.com/parse-community/parse-server/issues?utf8=%E2%9C%93&q=is%3Aissue 
 
 --- Please use this template. If you don't use this template, your issue may be closed without comment. ---
+--->
 
 ### Issue Description
 
-Describe your issue in as much detail as possible.
+<!--- Describe your issue in as much detail as possible. -->
 
-### Steps to reproduce
+### Push Configuration
 
-Please include a detailed list of steps that reproduce the issue. Include curl commands when applicable.
-
-#### Expected Results
-
-What you expected to happen.
-
-#### Actual Outcome
-
-What is happening instead.
+Please provide a copy of your `push` configuration here, obfuscating any sensitive part.
 
 ### Environment Setup
 
@@ -42,4 +48,4 @@ What is happening instead.
 
 ### Logs/Trace
 
-Include all relevant logs. You can turn on additional logging by configuring VERBOSE=1 in your environment.
+<!--- Include all relevant logs. You can turn on additional logging by configuring VERBOSE=1 in your environment. --->

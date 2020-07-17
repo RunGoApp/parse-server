@@ -1,5 +1,5 @@
 import AdaptableController from './AdaptableController';
-import CacheAdapter        from '../Adapters/Cache/CacheAdapter';
+import CacheAdapter from '../Adapters/Cache/CacheAdapter';
 
 const KEY_SEPARATOR_CHAR = ':';
 
@@ -39,14 +39,13 @@ export class SubCache {
   }
 }
 
-
 export class CacheController extends AdaptableController {
-
   constructor(adapter, appId, options = {}) {
     super(adapter, appId, options);
 
     this.role = new SubCache('role', this);
     this.user = new SubCache('user', this);
+    this.graphQL = new SubCache('graphQL', this);
   }
 
   get(key) {

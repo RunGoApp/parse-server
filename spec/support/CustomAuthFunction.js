@@ -1,14 +1,13 @@
-
-module.exports = function(validAuthData) {
+module.exports = function (validAuthData) {
   return {
-    validateAppId: function() {
+    validateAppId: function () {
       return Promise.resolve();
     },
-    validateAuthData: function(authData) {
+    validateAuthData: function (authData) {
       if (authData.token == validAuthData.token) {
         return Promise.resolve();
       }
       return Promise.reject();
-    }
-  }
-}
+    },
+  };
+};

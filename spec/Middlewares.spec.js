@@ -1,9 +1,9 @@
-var middlewares = require('../src/middlewares');
-var AppCache = require('../src/cache').AppCache;
+const middlewares = require('../lib/middlewares');
+const AppCache = require('../lib/cache').AppCache;
 
 describe('middlewares', () => {
 
-  var fakeReq, fakeRes;
+  let fakeReq, fakeRes;
 
   beforeEach(() => {
     fakeReq = {
@@ -27,7 +27,7 @@ describe('middlewares', () => {
 
   it('should use _ContentType if provided', (done) => {
     expect(fakeReq.headers['content-type']).toEqual(undefined);
-    var contentType = 'image/jpeg';
+    const contentType = 'image/jpeg';
     fakeReq.body._ContentType = contentType;
     middlewares.handleParseHeaders(fakeReq, fakeRes, () => {
       expect(fakeReq.headers['content-type']).toEqual(contentType);
@@ -289,5 +289,17 @@ describe('middlewares', () => {
     fakeReq.headers['x-forwarded-for'] = '';
     middlewares.handleParseHeaders(fakeReq, fakeRes);
     expect(fakeRes.status).toHaveBeenCalledWith(403);
+  });
+
+  it('should properly expose the headers', () => {
+    const headers = {};
+    const res = {
+      header: (key, value) => {
+        headers[key] = value
+      }
+    };
+    middlewares.allowCrossDomain({}, res, () => {});
+    expect(Object.keys(headers).length).toBe(4);
+    expect(headers['Access-Control-Expose-Headers']).toBe('X-Parse-Job-Status-Id, X-Parse-Push-Status-Id');
   });
 });

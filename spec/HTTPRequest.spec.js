@@ -1,42 +1,52 @@
 'use strict';
 
-var httpRequest = require("../src/cloud-code/httpRequest"),
-  HTTPResponse = require('../src/cloud-code/HTTPResponse').default,
+const httpRequest = require("../lib/cloud-code/httpRequest"),
+  HTTPResponse = require('../lib/cloud-code/HTTPResponse').default,
   bodyParser = require('body-parser'),
   express = require("express");
 
-var port = 13371;
-var httpRequestServer = "http://localhost:" + port;
+const port = 13371;
+const httpRequestServer = "http://localhost:" + port;
 
-var app = express();
-app.use(bodyParser.json({ 'type': '*/*' }));
-app.get("/hello", function(req, res){
-  res.json({response: "OK"});
-});
+function startServer(done) {
+  const app = express();
+  app.use(bodyParser.json({ 'type': '*/*' }));
+  app.get("/hello", function(req, res){
+    res.json({response: "OK"});
+  });
 
-app.get("/404", function(req, res){
-  res.status(404);
-  res.send("NO");
-});
+  app.get("/404", function(req, res){
+    res.status(404);
+    res.send("NO");
+  });
 
-app.get("/301", function(req, res){
-  res.status(301);
-  res.location("/hello");
-  res.send();
-});
+  app.get("/301", function(req, res){
+    res.status(301);
+    res.location("/hello");
+    res.send();
+  });
 
-app.post('/echo', function(req, res){
-  res.json(req.body);
-});
+  app.post('/echo', function(req, res){
+    res.json(req.body);
+  });
 
-app.get('/qs', function(req, res){
-  res.json(req.query);
-});
+  app.get('/qs', function(req, res){
+    res.json(req.query);
+  });
 
-app.listen(13371);
-
+  return app.listen(13371, undefined, done);
+}
 
 describe("httpRequest", () => {
+  let server;
+  beforeAll((done) => {
+    server = startServer(done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
   it("should do /hello", (done) => {
     httpRequest({
       url: httpRequestServer + "/hello"
@@ -53,7 +63,7 @@ describe("httpRequest", () => {
   });
 
   it("should do /hello with callback and promises", (done) => {
-    var calls = 0;
+    let calls = 0;
     httpRequest({
       url: httpRequestServer + "/hello",
       success: function() { calls++; },
@@ -102,7 +112,7 @@ describe("httpRequest", () => {
   });
 
   it("should fail on 404", (done) => {
-    var calls = 0;
+    let calls = 0;
     httpRequest({
       url: httpRequestServer + "/404",
       success: function() {
@@ -122,23 +132,8 @@ describe("httpRequest", () => {
     });
   })
 
-  it("should fail on 404", (done) => {
-    httpRequest({
-      url: httpRequestServer + "/404",
-    }).then(function(){
-      fail("should not succeed");
-      done();
-    }, function(httpResponse){
-      expect(httpResponse.status).toBe(404);
-      expect(httpResponse.buffer).toEqual(new Buffer('NO'));
-      expect(httpResponse.text).toEqual('NO');
-      expect(httpResponse.data).toBe(undefined);
-      done();
-    })
-  })
-
   it("should post on echo", (done) => {
-    var calls = 0;
+    let calls = 0;
     httpRequest({
       method: "POST",
       url: httpRequestServer + "/echo",
@@ -307,7 +302,7 @@ describe("httpRequest", () => {
     const httpResponse = new HTTPResponse({}, new Buffer(json));
     const encoded = Parse._encode(httpResponse);
     let foundData, foundText, foundBody = false;
-    for(var key in encoded) {
+    for(const key in encoded) {
       if (key == 'data') {
         foundData = true;
       }

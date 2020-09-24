@@ -5,13 +5,25 @@
 'use strict';
 
 const Parse = require('parse/node');
+const rp = require('request-promise');
+
+const masterKeyHeaders = {
+  'X-Parse-Application-Id': 'test',
+  'X-Parse-Rest-API-Key': 'test',
+  'X-Parse-Master-Key': 'test'
+}
+
+const masterKeyOptions = {
+  headers: masterKeyHeaders,
+  json: true
+}
 
 describe('Parse.Query testing', () => {
   it("basic query", function(done) {
-    var baz = new TestObject({ foo: 'baz' });
-    var qux = new TestObject({ foo: 'qux' });
+    const baz = new TestObject({ foo: 'baz' });
+    const qux = new TestObject({ foo: 'qux' });
     Parse.Object.saveAll([baz, qux], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.equalTo('foo', 'baz');
       query.find({
         success: function(results) {
@@ -24,11 +36,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("searching for null", function(done) {
-    var baz = new TestObject({ foo: null });
-    var qux = new TestObject({ foo: 'qux' });
-    var qux2 = new TestObject({ });
+    const baz = new TestObject({ foo: null });
+    const qux = new TestObject({ foo: 'qux' });
+    const qux2 = new TestObject({ });
     Parse.Object.saveAll([baz, qux, qux2], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.equalTo('foo', null);
       query.find({
         success: function(results) {
@@ -50,11 +62,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("searching for not null", function(done) {
-    var baz = new TestObject({ foo: null });
-    var qux = new TestObject({ foo: 'qux' });
-    var qux2 = new TestObject({ });
+    const baz = new TestObject({ foo: null });
+    const qux = new TestObject({ foo: 'qux' });
+    const qux2 = new TestObject({ });
     Parse.Object.saveAll([baz, qux, qux2], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.notEqualTo('foo', null);
       query.find({
         success: function(results) {
@@ -78,22 +90,22 @@ describe('Parse.Query testing', () => {
   });
 
   it("notEqualTo with Relation is working", function(done) {
-    var user = new Parse.User();
+    const user = new Parse.User();
     user.setPassword("asdf");
     user.setUsername("zxcv");
 
-    var user1 = new Parse.User();
+    const user1 = new Parse.User();
     user1.setPassword("asdf");
     user1.setUsername("qwerty");
 
-    var user2 = new Parse.User();
+    const user2 = new Parse.User();
     user2.setPassword("asdf");
     user2.setUsername("asdf");
 
-    var Cake = Parse.Object.extend("Cake");
-    var cake1 = new Cake();
-    var cake2 = new Cake();
-    var cake3 = new Cake();
+    const Cake = Parse.Object.extend("Cake");
+    const cake1 = new Cake();
+    const cake2 = new Cake();
+    const cake3 = new Cake();
 
 
     user.signUp().then(function(){
@@ -101,40 +113,40 @@ describe('Parse.Query testing', () => {
     }).then(function(){
       return user2.signUp();
     }).then(function(){
-      var relLike1 = cake1.relation("liker");
+      const relLike1 = cake1.relation("liker");
       relLike1.add([user, user1]);
 
-      var relDislike1 = cake1.relation("hater");
+      const relDislike1 = cake1.relation("hater");
       relDislike1.add(user2);
 
       return cake1.save();
     }).then(function(){
-      var rellike2 = cake2.relation("liker");
+      const rellike2 = cake2.relation("liker");
       rellike2.add([user, user1]);
 
-      var relDislike2 = cake2.relation("hater");
+      const relDislike2 = cake2.relation("hater");
       relDislike2.add(user2);
 
-      var relSomething = cake2.relation("something");
+      const relSomething = cake2.relation("something");
       relSomething.add(user);
 
       return cake2.save();
     }).then(function(){
-      var rellike3 = cake3.relation("liker");
+      const rellike3 = cake3.relation("liker");
       rellike3.add(user);
 
-      var relDislike3 = cake3.relation("hater");
+      const relDislike3 = cake3.relation("hater");
       relDislike3.add([user1, user2]);
       return cake3.save();
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       // User2 likes nothing so we should receive 0
       query.equalTo("liker", user2);
       return query.find().then(function(results){
         equal(results.length, 0);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       // User1 likes two of three cakes
       query.equalTo("liker", user1);
       return query.find().then(function(results){
@@ -142,7 +154,7 @@ describe('Parse.Query testing', () => {
         equal(results.length, 2);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       // We want to know which cake the user1 is not appreciating -> cake3
       query.notEqualTo("liker", user1);
       return query.find().then(function(results){
@@ -150,21 +162,21 @@ describe('Parse.Query testing', () => {
         equal(results.length, 1);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       // User2 is a hater of everything so we should receive 0
       query.notEqualTo("hater", user2);
       return query.find().then(function(results){
         equal(results.length, 0);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       // Only cake3 is liked by user
       query.notContainedIn("liker", [user1]);
       return query.find().then(function(results){
         equal(results.length, 1);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       // All the users
       query.containedIn("liker", [user, user1, user2]);
       // Exclude user 1
@@ -176,7 +188,7 @@ describe('Parse.Query testing', () => {
         expect(cake.id).toBe(cake3.id);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       // Exclude user1
       query.notEqualTo("liker", user1);
       // Only cake1
@@ -186,7 +198,7 @@ describe('Parse.Query testing', () => {
         equal(results.length, 0);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       query.notEqualTo("hater", user2);
       query.notEqualTo("liker", user2);
       // user2 doesn't like any cake so this should be 0
@@ -194,7 +206,7 @@ describe('Parse.Query testing', () => {
         equal(results.length, 0);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       query.equalTo("hater", user);
       query.equalTo("liker", user);
       // user doesn't hate any cake so this should be 0
@@ -202,7 +214,7 @@ describe('Parse.Query testing', () => {
         equal(results.length, 0);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       query.equalTo("hater", null);
       query.equalTo("liker", null);
       // user doesn't hate any cake so this should be 0
@@ -210,7 +222,7 @@ describe('Parse.Query testing', () => {
         equal(results.length, 0);
       });
     }).then(function(){
-      var query = new Parse.Query(Cake);
+      const query = new Parse.Query(Cake);
       query.equalTo("something", null);
       // user doesn't hate any cake so this should be 0
       return query.find().then(function(results){
@@ -225,10 +237,10 @@ describe('Parse.Query testing', () => {
   });
 
   it("query with limit", function(done) {
-    var baz = new TestObject({ foo: 'baz' });
-    var qux = new TestObject({ foo: 'qux' });
+    const baz = new TestObject({ foo: 'baz' });
+    const qux = new TestObject({ foo: 'qux' });
     Parse.Object.saveAll([baz, qux], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.limit(1);
       query.find({
         success: function(results) {
@@ -240,11 +252,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("query with limit equal to maxlimit", function(done) {
-    var baz = new TestObject({ foo: 'baz' });
-    var qux = new TestObject({ foo: 'qux' });
+    const baz = new TestObject({ foo: 'baz' });
+    const qux = new TestObject({ foo: 'qux' });
     reconfigureServer({ maxLimit: 1 })
     Parse.Object.saveAll([baz, qux], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.limit(1);
       query.find({
         success: function(results) {
@@ -256,11 +268,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("query with limit exceeding maxlimit", function(done) {
-    var baz = new TestObject({ foo: 'baz' });
-    var qux = new TestObject({ foo: 'qux' });
+    const baz = new TestObject({ foo: 'baz' });
+    const qux = new TestObject({ foo: 'qux' });
     reconfigureServer({ maxLimit: 1 })
     Parse.Object.saveAll([baz, qux], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.limit(2);
       query.find({
         success: function(results) {
@@ -272,9 +284,9 @@ describe('Parse.Query testing', () => {
   });
 
   it("containedIn object array queries", function(done) {
-    var messageList = [];
-    for (var i = 0; i < 4; ++i) {
-      var message = new TestObject({});
+    const messageList = [];
+    for (let  i = 0; i < 4; ++i) {
+      const message = new TestObject({});
       if (i > 0) {
         message.set('prior', messageList[i - 1]);
       }
@@ -284,11 +296,11 @@ describe('Parse.Query testing', () => {
     Parse.Object.saveAll(messageList, function() {
       equal(messageList.length, 4);
 
-      var inList = [];
+      const inList = [];
       inList.push(messageList[0]);
       inList.push(messageList[2]);
 
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.containedIn('prior', inList);
       query.find({
         success: function(results) {
@@ -356,14 +368,14 @@ describe('Parse.Query testing', () => {
   });
 
   it("containsAll number array queries", function(done) {
-    var NumberSet = Parse.Object.extend({ className: "NumberSet" });
+    const NumberSet = Parse.Object.extend({ className: "NumberSet" });
 
-    var objectsList = [];
+    const objectsList = [];
     objectsList.push(new NumberSet({ "numbers" : [1, 2, 3, 4, 5] }));
     objectsList.push(new NumberSet({ "numbers" : [1, 3, 4, 5] }));
 
     Parse.Object.saveAll(objectsList, function() {
-      var query = new Parse.Query(NumberSet);
+      const query = new Parse.Query(NumberSet);
       query.containsAll("numbers", [1, 2, 3]);
       query.find({
         success: function(results) {
@@ -382,14 +394,14 @@ describe('Parse.Query testing', () => {
   });
 
   it("containsAll string array queries", function(done) {
-    var StringSet = Parse.Object.extend({ className: "StringSet" });
+    const StringSet = Parse.Object.extend({ className: "StringSet" });
 
-    var objectsList = [];
+    const objectsList = [];
     objectsList.push(new StringSet({ "strings" : ["a", "b", "c", "d", "e"] }));
     objectsList.push(new StringSet({ "strings" : ["a", "c", "d", "e"] }));
 
     Parse.Object.saveAll(objectsList, function() {
-      var query = new Parse.Query(StringSet);
+      const query = new Parse.Query(StringSet);
       query.containsAll("strings", ["a", "b", "c"]);
       query.find({
         success: function(results) {
@@ -404,36 +416,36 @@ describe('Parse.Query testing', () => {
   });
 
   it("containsAll date array queries", function(done) {
-    var DateSet = Parse.Object.extend({ className: "DateSet" });
+    const DateSet = Parse.Object.extend({ className: "DateSet" });
 
     function parseDate(iso8601) {
-      var regexp = new RegExp(
+      const regexp = new RegExp(
         '^([0-9]{1,4})-([0-9]{1,2})-([0-9]{1,2})' + 'T' +
           '([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})' +
           '(.([0-9]+))?' + 'Z$');
-      var match = regexp.exec(iso8601);
+      const match = regexp.exec(iso8601);
       if (!match) {
         return null;
       }
 
-      var year = match[1] || 0;
-      var month = (match[2] || 1) - 1;
-      var day = match[3] || 0;
-      var hour = match[4] || 0;
-      var minute = match[5] || 0;
-      var second = match[6] || 0;
-      var milli = match[8] || 0;
+      const year = match[1] || 0;
+      const month = (match[2] || 1) - 1;
+      const day = match[3] || 0;
+      const hour = match[4] || 0;
+      const minute = match[5] || 0;
+      const second = match[6] || 0;
+      const milli = match[8] || 0;
 
       return new Date(Date.UTC(year, month, day, hour, minute, second, milli));
     }
 
-    var makeDates = function(stringArray) {
+    const makeDates = function(stringArray) {
       return stringArray.map(function(dateStr) {
         return parseDate(dateStr + "T00:00:00Z");
       });
     };
 
-    var objectsList = [];
+    const objectsList = [];
     objectsList.push(new DateSet({
       "dates" : makeDates(["2013-02-01", "2013-02-02", "2013-02-03",
         "2013-02-04"])
@@ -443,7 +455,7 @@ describe('Parse.Query testing', () => {
     }));
 
     Parse.Object.saveAll(objectsList, function() {
-      var query = new Parse.Query(DateSet);
+      const query = new Parse.Query(DateSet);
       query.containsAll("dates", makeDates(
         ["2013-02-01", "2013-02-02", "2013-02-03"]));
       query.find({
@@ -461,31 +473,31 @@ describe('Parse.Query testing', () => {
 
   it("containsAll object array queries", function(done) {
 
-    var MessageSet = Parse.Object.extend({ className: "MessageSet" });
+    const MessageSet = Parse.Object.extend({ className: "MessageSet" });
 
-    var messageList = [];
-    for (var i = 0; i < 4; ++i) {
+    const messageList = [];
+    for (let  i = 0; i < 4; ++i) {
       messageList.push(new TestObject({ 'i' : i }));
     }
 
     Parse.Object.saveAll(messageList, function() {
       equal(messageList.length, 4);
 
-      var messageSetList = [];
+      const messageSetList = [];
       messageSetList.push(new MessageSet({ 'messages' : messageList }));
 
-      var someList = [];
+      const someList = [];
       someList.push(messageList[0]);
       someList.push(messageList[1]);
       someList.push(messageList[3]);
       messageSetList.push(new MessageSet({ 'messages' : someList }));
 
       Parse.Object.saveAll(messageSetList, function() {
-        var inList = [];
+        const inList = [];
         inList.push(messageList[0]);
         inList.push(messageList[2]);
 
-        var query = new Parse.Query(MessageSet);
+        const query = new Parse.Query(MessageSet);
         query.containsAll('messages', inList);
         query.find({
           success: function(results) {
@@ -497,17 +509,365 @@ describe('Parse.Query testing', () => {
     });
   });
 
-  var BoxedNumber = Parse.Object.extend({
+  it('containsAllStartingWith should match all strings that starts with string', (done) => {
+
+    const object = new Parse.Object('Object');
+    object.set('strings', ['the', 'brown', 'lazy', 'fox', 'jumps']);
+    const object2 = new Parse.Object('Object');
+    object2.set('strings', ['the', 'brown', 'fox', 'jumps']);
+    const object3 = new Parse.Object('Object');
+    object3.set('strings', ['over', 'the', 'lazy', 'dog']);
+
+    const objectList = [object, object2, object3];
+
+    Parse.Object.saveAll(objectList).then((results) => {
+      equal(objectList.length, results.length);
+
+      return require('request-promise').get({
+        url: Parse.serverURL + "/classes/Object",
+        json: {
+          where: {
+            strings: {
+              $all: [
+                {$regex: '\^\\Qthe\\E'},
+                {$regex: '\^\\Qfox\\E'},
+                {$regex: '\^\\Qlazy\\E'}
+              ]
+            }
+          }
+        },
+        headers: {
+          'X-Parse-Application-Id': Parse.applicationId,
+          'X-Parse-Javascript-Key': Parse.javaScriptKey
+        }
+      })
+        .then(function (results) {
+          equal(results.results.length, 1);
+          arrayContains(results.results, object);
+
+          return require('request-promise').get({
+            url: Parse.serverURL + "/classes/Object",
+            json: {
+              where: {
+                strings: {
+                  $all: [
+                    {$regex: '\^\\Qthe\\E'},
+                    {$regex: '\^\\Qlazy\\E'}
+                  ]
+                }
+              }
+            },
+            headers: {
+              'X-Parse-Application-Id': Parse.applicationId,
+              'X-Parse-Javascript-Key': Parse.javaScriptKey
+            }
+          });
+        })
+        .then(function (results) {
+          equal(results.results.length, 2);
+          arrayContains(results.results, object);
+          arrayContains(results.results, object3);
+
+          return require('request-promise').get({
+            url: Parse.serverURL + "/classes/Object",
+            json: {
+              where: {
+                strings: {
+                  $all: [
+                    {$regex: '\^\\Qhe\\E'},
+                    {$regex: '\^\\Qlazy\\E'}
+                  ]
+                }
+              }
+            },
+            headers: {
+              'X-Parse-Application-Id': Parse.applicationId,
+              'X-Parse-Javascript-Key': Parse.javaScriptKey
+            }
+          });
+        })
+        .then(function (results) {
+          equal(results.results.length, 0);
+
+          done();
+        });
+    });
+  });
+
+  it('containsAllStartingWith values must be all of type starting with regex', (done) => {
+
+    const object = new Parse.Object('Object');
+    object.set('strings', ['the', 'brown', 'lazy', 'fox', 'jumps']);
+
+    object.save().then(() => {
+      equal(object.isNew(), false);
+
+      return require('request-promise').get({
+        url: Parse.serverURL + "/classes/Object",
+        json: {
+          where: {
+            strings: {
+              $all: [
+                {$regex: '\^\\Qthe\\E'},
+                {$regex: '\^\\Qlazy\\E'},
+                {$regex: '\^\\Qfox\\E'},
+                {$unknown: /unknown/}
+              ]
+            }
+          }
+        },
+        headers: {
+          'X-Parse-Application-Id': Parse.applicationId,
+          'X-Parse-Javascript-Key': Parse.javaScriptKey
+        }
+      });
+    })
+      .then(function () {
+      }, function () {
+        done();
+      });
+  });
+
+  it('containsAllStartingWith empty array values should return empty results', (done) => {
+
+    const object = new Parse.Object('Object');
+    object.set('strings', ['the', 'brown', 'lazy', 'fox', 'jumps']);
+
+    object.save().then(() => {
+      equal(object.isNew(), false);
+
+      return require('request-promise').get({
+        url: Parse.serverURL + "/classes/Object",
+        json: {
+          where: {
+            strings: {
+              $all: []
+            }
+          }
+        },
+        headers: {
+          'X-Parse-Application-Id': Parse.applicationId,
+          'X-Parse-Javascript-Key': Parse.javaScriptKey
+        }
+      });
+    })
+      .then(function (results) {
+        equal(results.results.length, 0);
+        done();
+      }, function () {
+      });
+  });
+
+  it('containsAllStartingWith single empty value returns empty results', (done) => {
+
+    const object = new Parse.Object('Object');
+    object.set('strings', ['the', 'brown', 'lazy', 'fox', 'jumps']);
+
+    object.save().then(() => {
+      equal(object.isNew(), false);
+
+      return require('request-promise').get({
+        url: Parse.serverURL + "/classes/Object",
+        json: {
+          where: {
+            strings: {
+              $all: [ {} ]
+            }
+          }
+        },
+        headers: {
+          'X-Parse-Application-Id': Parse.applicationId,
+          'X-Parse-Javascript-Key': Parse.javaScriptKey
+        }
+      });
+    })
+      .then(function (results) {
+        equal(results.results.length, 0);
+        done();
+      }, function () {
+      });
+  });
+
+  it('containsAllStartingWith single regex value should return corresponding matching results', (done) => {
+
+    const object = new Parse.Object('Object');
+    object.set('strings', ['the', 'brown', 'lazy', 'fox', 'jumps']);
+    const object2 = new Parse.Object('Object');
+    object2.set('strings', ['the', 'brown', 'fox', 'jumps']);
+    const object3 = new Parse.Object('Object');
+    object3.set('strings', ['over', 'the', 'lazy', 'dog']);
+
+    const objectList = [object, object2, object3];
+
+    Parse.Object.saveAll(objectList).then((results) => {
+      equal(objectList.length, results.length);
+
+      return require('request-promise').get({
+        url: Parse.serverURL + "/classes/Object",
+        json: {
+          where: {
+            strings: {
+              $all: [ {$regex: '\^\\Qlazy\\E'} ]
+            }
+          }
+        },
+        headers: {
+          'X-Parse-Application-Id': Parse.applicationId,
+          'X-Parse-Javascript-Key': Parse.javaScriptKey
+        }
+      });
+    })
+      .then(function (results) {
+        equal(results.results.length, 2);
+        done();
+      }, function () {
+      });
+  });
+
+  it('containsAllStartingWith single invalid regex returns empty results', (done) => {
+
+    const object = new Parse.Object('Object');
+    object.set('strings', ['the', 'brown', 'lazy', 'fox', 'jumps']);
+
+    object.save().then(() => {
+      equal(object.isNew(), false);
+
+      return require('request-promise').get({
+        url: Parse.serverURL + "/classes/Object",
+        json: {
+          where: {
+            strings: {
+              $all: [ {$unknown: '\^\\Qlazy\\E'} ]
+            }
+          }
+        },
+        headers: {
+          'X-Parse-Application-Id': Parse.applicationId,
+          'X-Parse-Javascript-Key': Parse.javaScriptKey
+        }
+      });
+    })
+      .then(function (results) {
+        equal(results.results.length, 0);
+        done();
+      }, function () {
+      });
+  });
+
+  it('containedBy pointer array', (done) => {
+    const objects = Array.from(Array(10).keys()).map((idx) => {
+      const obj = new Parse.Object('Object');
+      obj.set('key', idx);
+      return obj;
+    });
+
+    const parent = new Parse.Object('Parent');
+    const parent2 = new Parse.Object('Parent');
+    const parent3 = new Parse.Object('Parent');
+
+    Parse.Object.saveAll(objects).then(() => {
+      // [0, 1, 2]
+      parent.set('objects', objects.slice(0, 3));
+
+      const shift = objects.shift();
+      // [2, 0]
+      parent2.set('objects', [objects[1], shift]);
+
+      // [1, 2, 3, 4]
+      parent3.set('objects', objects.slice(1, 4));
+
+      return Parse.Object.saveAll([parent, parent2, parent3]);
+    }).then(() => {
+      // [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      const pointers =  objects.map(object => object.toPointer());
+
+      // Return all Parent where all parent.objects are contained in objects
+      return rp.get({
+        url: Parse.serverURL + "/classes/Parent",
+        json: {
+          where: {
+            objects: {
+              $containedBy: pointers
+            }
+          }
+        },
+        headers: {
+          'X-Parse-Application-Id': Parse.applicationId,
+          'X-Parse-Javascript-Key': Parse.javaScriptKey
+        }
+      });
+    }).then((results) => {
+      expect(results.results[0].objectId).not.toBeUndefined();
+      expect(results.results[0].objectId).toBe(parent3.id);
+      expect(results.results.length).toBe(1);
+      done();
+    });
+  });
+
+
+  it('containedBy number array', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: { numbers: { $containedBy: [1, 2, 3, 4, 5, 6, 7, 8, 9] } },
+      }
+    });
+    const obj1 = new TestObject({ numbers: [0, 1, 2] });
+    const obj2 = new TestObject({ numbers: [2, 0] });
+    const obj3 = new TestObject({ numbers: [1, 2, 3, 4] });
+    Parse.Object.saveAll([obj1, obj2, obj3]).then(() => {
+      return rp.get(Parse.serverURL + "/classes/TestObject", options);
+    }).then((results) => {
+      expect(results.results[0].objectId).not.toBeUndefined();
+      expect(results.results[0].objectId).toBe(obj3.id);
+      expect(results.results.length).toBe(1);
+      done();
+    });
+  });
+
+  it('containedBy empty array', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: { numbers: { $containedBy: [] } },
+      }
+    });
+    const obj1 = new TestObject({ numbers: [0, 1, 2] });
+    const obj2 = new TestObject({ numbers: [2, 0] });
+    const obj3 = new TestObject({ numbers: [1, 2, 3, 4] });
+    Parse.Object.saveAll([obj1, obj2, obj3]).then(() => {
+      return rp.get(Parse.serverURL + "/classes/TestObject", options);
+    }).then((results) => {
+      expect(results.results.length).toBe(0);
+      done();
+    });
+  });
+
+  it('containedBy invalid query', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: { objects: { $containedBy: 1234 } },
+      }
+    });
+    const obj = new TestObject();
+    obj.save().then(() => {
+      return rp.get(Parse.serverURL + "/classes/TestObject", options);
+    }).then(done.fail).catch((error) => {
+      equal(error.error.code, Parse.Error.INVALID_JSON);
+      equal(error.error.error, 'bad $containedBy: should be an array');
+      done();
+    });
+  });
+
+  const BoxedNumber = Parse.Object.extend({
     className: "BoxedNumber"
   });
 
   it("equalTo queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.equalTo('number', 3);
         query.find({
           success: function(results) {
@@ -519,12 +879,12 @@ describe('Parse.Query testing', () => {
   });
 
   it("equalTo undefined", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.equalTo('number', undefined);
         query.find(expectSuccess({
           success: function(results) {
@@ -536,12 +896,12 @@ describe('Parse.Query testing', () => {
   });
 
   it("lessThan queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.lessThan('number', 7);
         query.find({
           success: function(results) {
@@ -553,13 +913,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("lessThanOrEqualTo queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.lessThanOrEqualTo('number', 7);
         query.find({
           success: function(results) {
@@ -570,14 +930,46 @@ describe('Parse.Query testing', () => {
       });
   });
 
+  it("lessThan zero queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.lessThan('number', 0);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 3);
+      done();
+    });
+  });
+
+  it("lessThanOrEqualTo zero queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.lessThanOrEqualTo('number', 0);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 4);
+      done();
+    });
+  });
+
   it("greaterThan queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.greaterThan('number', 7);
         query.find({
           success: function(results) {
@@ -589,13 +981,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("greaterThanOrEqualTo queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.greaterThanOrEqualTo('number', 7);
         query.find({
           success: function(results) {
@@ -606,14 +998,46 @@ describe('Parse.Query testing', () => {
       });
   });
 
+  it("greaterThan zero queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.greaterThan('number', 0);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 1);
+      done();
+    });
+  });
+
+  it("greaterThanOrEqualTo zero queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.greaterThanOrEqualTo('number', 0);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 2);
+      done();
+    });
+  });
+
   it("lessThanOrEqualTo greaterThanOrEqualTo queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.lessThanOrEqualTo('number', 7);
         query.greaterThanOrEqualTo('number', 7);
         query.find({
@@ -626,13 +1050,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("lessThan greaterThan queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.lessThan('number', 9);
         query.greaterThan('number', 3);
         query.find({
@@ -645,13 +1069,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("notEqualTo queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.notEqualTo('number', 5);
         query.find({
           success: function(results) {
@@ -662,14 +1086,109 @@ describe('Parse.Query testing', () => {
       });
   });
 
+  it("notEqualTo zero queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.notEqualTo('number', 0);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 4);
+      done();
+    });
+  });
+
+  it("equalTo zero queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.equalTo('number', 0);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 1);
+      done();
+    });
+  });
+
+  it("number equalTo boolean queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.equalTo('number', false);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 0);
+      done();
+    });
+  });
+
+  it("equalTo false queries", (done) => {
+    const obj1 = new TestObject({ field: false });
+    const obj2 = new TestObject({ field: true });
+    Parse.Object.saveAll([obj1, obj2]).then(() => {
+      const query = new Parse.Query(TestObject);
+      query.equalTo('field', false);
+      return query.find();
+    }).then((results) => {
+      equal(results.length, 1);
+      done();
+    });
+  });
+
+  it("where $eq false queries (rest)", (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: { field: { $eq: false } },
+      }
+    });
+    const obj1 = new TestObject({ field: false });
+    const obj2 = new TestObject({ field: true });
+    Parse.Object.saveAll([obj1, obj2]).then(() => {
+      rp.get(Parse.serverURL + '/classes/TestObject', options)
+        .then((resp) => {
+          equal(resp.results.length, 1);
+          done();
+        });
+    })
+  });
+
+  it("where $eq null queries (rest)", (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: { field: { $eq: null } },
+      }
+    });
+    const obj1 = new TestObject({ field: false });
+    const obj2 = new TestObject({ field: null });
+    Parse.Object.saveAll([obj1, obj2]).then(() => {
+      rp.get(Parse.serverURL + '/classes/TestObject', options)
+        .then((resp) => {
+          equal(resp.results.length, 1);
+          done();
+        });
+    })
+  });
+
   it("containedIn queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.containedIn('number', [3,5,7,9,11]);
         query.find({
           success: function(results) {
@@ -680,14 +1199,48 @@ describe('Parse.Query testing', () => {
       });
   });
 
+  it("containedIn false queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.containedIn('number', false);
+      return query.find();
+    }).then(done.fail).catch((error) => {
+      equal(error.code, Parse.Error.INVALID_JSON);
+      equal(error.message, 'bad $in value');
+      done();
+    });
+  });
+
+  it("notContainedIn false queries", (done) => {
+    const makeBoxedNumber = (i) => {
+      return new BoxedNumber({ number: i });
+    };
+    const numbers = [-3, -2, -1, 0, 1];
+    const boxedNumbers = numbers.map(makeBoxedNumber);
+    Parse.Object.saveAll(boxedNumbers).then(() => {
+      const query = new Parse.Query(BoxedNumber);
+      query.notContainedIn('number', false);
+      return query.find();
+    }).then(done.fail).catch((error) => {
+      equal(error.code, Parse.Error.INVALID_JSON);
+      equal(error.message, 'bad $nin value');
+      done();
+    });
+  });
+
   it("notContainedIn queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.notContainedIn('number', [3,5,7,9,11]);
         query.find({
           success: function(results) {
@@ -700,13 +1253,13 @@ describe('Parse.Query testing', () => {
 
 
   it("objectId containedIn queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function(list) {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.containedIn('objectId',
           [list[2].id, list[3].id, list[0].id,
             "NONSENSE"]);
@@ -727,13 +1280,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("objectId equalTo queries", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function(list) {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.equalTo('objectId', list[4].id);
         query.find({
           success: function(results) {
@@ -750,13 +1303,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("find no elements", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.equalTo('number', 17);
         query.find(expectSuccess({
           success: function(results) {
@@ -768,7 +1321,7 @@ describe('Parse.Query testing', () => {
   });
 
   it("find with error", function(done) {
-    var query = new Parse.Query(BoxedNumber);
+    const query = new Parse.Query(BoxedNumber);
     query.equalTo('$foo', 'bar');
     query.find(expectError(Parse.Error.INVALID_KEY_NAME, done));
   });
@@ -776,8 +1329,8 @@ describe('Parse.Query testing', () => {
   it("get", function(done) {
     Parse.Object.saveAll([new TestObject({foo: 'bar'})], function(items) {
       ok(items[0]);
-      var objectId = items[0].id;
-      var query = new Parse.Query(TestObject);
+      const objectId = items[0].id;
+      const query = new Parse.Query(TestObject);
       query.get(objectId, {
         success: function(result) {
           ok(result);
@@ -794,7 +1347,7 @@ describe('Parse.Query testing', () => {
   it("get undefined", function(done) {
     Parse.Object.saveAll([new TestObject({foo: 'bar'})], function(items) {
       ok(items[0]);
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.get(undefined, {
         success: fail,
         error: done,
@@ -805,7 +1358,7 @@ describe('Parse.Query testing', () => {
   it("get error", function(done) {
     Parse.Object.saveAll([new TestObject({foo: 'bar'})], function(items) {
       ok(items[0]);
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.get("InvalidObjectID", {
         success: function() {
           ok(false, "The get should have failed.");
@@ -821,7 +1374,7 @@ describe('Parse.Query testing', () => {
 
   it("first", function(done) {
     Parse.Object.saveAll([new TestObject({foo: 'bar'})], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.equalTo('foo', 'bar');
       query.first({
         success: function(result) {
@@ -834,7 +1387,7 @@ describe('Parse.Query testing', () => {
 
   it("first no result", function(done) {
     Parse.Object.saveAll([new TestObject({foo: 'bar'})], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.equalTo('foo', 'baz');
       query.first({
         success: function(result) {
@@ -848,7 +1401,7 @@ describe('Parse.Query testing', () => {
   it("first with two results", function(done) {
     Parse.Object.saveAll([new TestObject({foo: 'bar'}),
       new TestObject({foo: 'bar'})], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.equalTo('foo', 'bar');
       query.first({
         success: function(result) {
@@ -860,22 +1413,22 @@ describe('Parse.Query testing', () => {
   });
 
   it("first with error", function(done) {
-    var query = new Parse.Query(BoxedNumber);
+    const query = new Parse.Query(BoxedNumber);
     query.equalTo('$foo', 'bar');
     query.first(expectError(Parse.Error.INVALID_KEY_NAME, done));
   });
 
-  var Container = Parse.Object.extend({
+  const Container = Parse.Object.extend({
     className: "Container"
   });
 
   it("notEqualTo object", function(done) {
-    var item1 = new TestObject();
-    var item2 = new TestObject();
-    var container1 = new Container({item: item1});
-    var container2 = new Container({item: item2});
+    const item1 = new TestObject();
+    const item2 = new TestObject();
+    const container1 = new Container({item: item1});
+    const container2 = new Container({item: item2});
     Parse.Object.saveAll([item1, item2, container1, container2], function() {
-      var query = new Parse.Query(Container);
+      const query = new Parse.Query(Container);
       query.notEqualTo('item', item1);
       query.find({
         success: function(results) {
@@ -888,7 +1441,7 @@ describe('Parse.Query testing', () => {
 
   it("skip", function(done) {
     Parse.Object.saveAll([new TestObject(), new TestObject()], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.skip(1);
       query.find({
         success: function(results) {
@@ -907,7 +1460,7 @@ describe('Parse.Query testing', () => {
 
   it("skip doesn't affect count", function(done) {
     Parse.Object.saveAll([new TestObject(), new TestObject()], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.count({
         success: function(count) {
           equal(count, 2);
@@ -930,13 +1483,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("count", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll(
       [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(makeBoxedNumber),
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.greaterThan("number", 1);
         query.count({
           success: function(count) {
@@ -948,11 +1501,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by ascending number", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll([3, 1, 2].map(makeBoxedNumber), function() {
-      var query = new Parse.Query(BoxedNumber);
+      const query = new Parse.Query(BoxedNumber);
       query.ascending("number");
       query.find(expectSuccess({
         success: function(results) {
@@ -967,11 +1520,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by descending number", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll([3, 1, 2].map(makeBoxedNumber)).then(function() {
-      var query = new Parse.Query(BoxedNumber);
+      const query = new Parse.Query(BoxedNumber);
       query.descending("number");
       query.find(expectSuccess({
         success: function(results) {
@@ -985,15 +1538,99 @@ describe('Parse.Query testing', () => {
     });
   });
 
+  it('can order on an object string field', function (done) {
+    const testSet = [
+      { sortField: { value: "Z" } },
+      { sortField: { value: "A" } },
+      { sortField: { value: "M" } },
+    ];
+
+    const objects = testSet.map(e => new Parse.Object('Test', e));
+    Parse.Object.saveAll(objects)
+      .then(() => new Parse.Query('Test').addDescending('sortField.value').first())
+      .then((result) => {
+        expect(result.get('sortField').value).toBe("Z");
+        return new Parse.Query('Test').addAscending('sortField.value').first()
+      })
+      .then((result) => {
+        expect(result.get('sortField').value).toBe("A");
+        done();
+      })
+      .catch(done.fail);
+  });
+
+  it('can order on an object string field (level 2)', function (done) {
+    const testSet = [
+      { sortField: { value: { field: "Z" } } },
+      { sortField: { value: { field: "A" } } },
+      { sortField: { value: { field: "M" } } },
+    ];
+
+    const objects = testSet.map(e => new Parse.Object('Test', e));
+    Parse.Object.saveAll(objects)
+      .then(() => new Parse.Query('Test').addDescending('sortField.value.field').first())
+      .then((result) => {
+        expect(result.get('sortField').value.field).toBe("Z");
+        return new Parse.Query('Test').addAscending('sortField.value.field').first()
+      })
+      .then((result) => {
+        expect(result.get('sortField').value.field).toBe("A");
+        done();
+      })
+      .catch(done.fail);
+  });
+
+  it('can order on an object number field', function (done) {
+    const testSet = [
+      { sortField: { value: 10 } },
+      { sortField: { value: 1 } },
+      { sortField: { value: 5 } },
+    ];
+
+    const objects = testSet.map(e => new Parse.Object('Test', e));
+    Parse.Object.saveAll(objects)
+      .then(() => new Parse.Query('Test').addDescending('sortField.value').first())
+      .then((result) => {
+        expect(result.get('sortField').value).toBe(10);
+        return new Parse.Query('Test').addAscending('sortField.value').first()
+      })
+      .then((result) => {
+        expect(result.get('sortField').value).toBe(1);
+        done();
+      })
+      .catch(done.fail);
+  });
+
+  it('can order on an object number field (level 2)', function (done) {
+    const testSet = [
+      { sortField: { value: { field: 10 } } },
+      { sortField: { value: { field: 1 } } },
+      { sortField: { value: { field: 5 } } },
+    ];
+
+    const objects = testSet.map(e => new Parse.Object('Test', e));
+    Parse.Object.saveAll(objects)
+      .then(() => new Parse.Query('Test').addDescending('sortField.value.field').first())
+      .then((result) => {
+        expect(result.get('sortField').value.field).toBe(10);
+        return new Parse.Query('Test').addAscending('sortField.value.field').first()
+      })
+      .then((result) => {
+        expect(result.get('sortField').value.field).toBe(1);
+        done();
+      })
+      .catch(done.fail);
+  });
+
   it("order by ascending number then descending string", function(done) {
-    var strings = ["a", "b", "c", "d"];
-    var makeBoxedNumber = function(num, i) {
+    const strings = ["a", "b", "c", "d"];
+    const makeBoxedNumber = function(num, i) {
       return new BoxedNumber({ number: num, string: strings[i] });
     };
     Parse.Object.saveAll(
       [3, 1, 3, 2].map(makeBoxedNumber)).then(
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.ascending("number").addDescending("string");
         query.find(expectSuccess({
           success: function(results) {
@@ -1013,15 +1650,15 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by descending number then ascending string", function(done) {
-    var strings = ["a", "b", "c", "d"];
-    var makeBoxedNumber = function(num, i) {
+    const strings = ["a", "b", "c", "d"];
+    const makeBoxedNumber = function(num, i) {
       return new BoxedNumber({ number: num, string: strings[i] });
     };
 
     const objects = [3, 1, 3, 2].map(makeBoxedNumber);
     Parse.Object.saveAll(objects)
       .then(() => {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.descending("number").addAscending("string");
         return query.find();
       }).then((results) => {
@@ -1042,13 +1679,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by descending number and string", function(done) {
-    var strings = ["a", "b", "c", "d"];
-    var makeBoxedNumber = function(num, i) {
+    const strings = ["a", "b", "c", "d"];
+    const makeBoxedNumber = function(num, i) {
       return new BoxedNumber({ number: num, string: strings[i] });
     };
     Parse.Object.saveAll([3, 1, 3, 2].map(makeBoxedNumber)).then(
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.descending("number,string");
         query.find(expectSuccess({
           success: function(results) {
@@ -1068,13 +1705,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by descending number and string, with space", function(done) {
-    var strings = ["a", "b", "c", "d"];
-    var makeBoxedNumber = function (num, i) {
+    const strings = ["a", "b", "c", "d"];
+    const makeBoxedNumber = function (num, i) {
       return new BoxedNumber({number: num, string: strings[i]});
     };
     Parse.Object.saveAll([3, 1, 3, 2].map(makeBoxedNumber)).then(
       function () {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.descending("number, string");
         query.find(expectSuccess({
           success: function (results) {
@@ -1098,13 +1735,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by descending number and string, with array arg", function(done) {
-    var strings = ["a", "b", "c", "d"];
-    var makeBoxedNumber = function(num, i) {
+    const strings = ["a", "b", "c", "d"];
+    const makeBoxedNumber = function(num, i) {
       return new BoxedNumber({ number: num, string: strings[i] });
     };
     Parse.Object.saveAll([3, 1, 3, 2].map(makeBoxedNumber)).then(
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.descending(["number", "string"]);
         query.find(expectSuccess({
           success: function(results) {
@@ -1124,13 +1761,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by descending number and string, with multiple args", function(done) {
-    var strings = ["a", "b", "c", "d"];
-    var makeBoxedNumber = function(num, i) {
+    const strings = ["a", "b", "c", "d"];
+    const makeBoxedNumber = function(num, i) {
       return new BoxedNumber({ number: num, string: strings[i] });
     };
     Parse.Object.saveAll([3, 1, 3, 2].map(makeBoxedNumber)).then(
       function() {
-        var query = new Parse.Query(BoxedNumber);
+        const query = new Parse.Query(BoxedNumber);
         query.descending("number", "string");
         query.find(expectSuccess({
           success: function(results) {
@@ -1150,27 +1787,27 @@ describe('Parse.Query testing', () => {
   });
 
   it("can't order by password", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
     Parse.Object.saveAll([3, 1, 2].map(makeBoxedNumber), function() {
-      var query = new Parse.Query(BoxedNumber);
+      const query = new Parse.Query(BoxedNumber);
       query.ascending("_password");
       query.find(expectError(Parse.Error.INVALID_KEY_NAME, done));
     });
   });
 
   it("order by _created_at", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
-    var numbers = [3, 1, 2].map(makeBoxedNumber);
+    const numbers = [3, 1, 2].map(makeBoxedNumber);
     numbers[0].save().then(() => {
       return numbers[1].save();
     }).then(() => {
       return numbers[2].save();
     }).then(function() {
-      var query = new Parse.Query(BoxedNumber);
+      const query = new Parse.Query(BoxedNumber);
       query.ascending("_created_at");
       query.find({
         success: function(results) {
@@ -1189,16 +1826,16 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by createdAt", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
-    var numbers = [3, 1, 2].map(makeBoxedNumber);
+    const numbers = [3, 1, 2].map(makeBoxedNumber);
     numbers[0].save().then(() => {
       return numbers[1].save();
     }).then(() => {
       return numbers[2].save();
     }).then(function() {
-      var query = new Parse.Query(BoxedNumber);
+      const query = new Parse.Query(BoxedNumber);
       query.descending("createdAt");
       query.find({
         success: function(results) {
@@ -1213,10 +1850,10 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by _updated_at", function(done) {
-    var makeBoxedNumber = function(i) {
+    const makeBoxedNumber = function(i) {
       return new BoxedNumber({ number: i });
     };
-    var numbers = [3, 1, 2].map(makeBoxedNumber);
+    const numbers = [3, 1, 2].map(makeBoxedNumber);
     numbers[0].save().then(() => {
       return numbers[1].save();
     }).then(() => {
@@ -1225,7 +1862,7 @@ describe('Parse.Query testing', () => {
       numbers[1].set("number", 4);
       numbers[1].save(null, {
         success: function() {
-          var query = new Parse.Query(BoxedNumber);
+          const query = new Parse.Query(BoxedNumber);
           query.ascending("_updated_at");
           query.find({
             success: function(results) {
@@ -1242,8 +1879,8 @@ describe('Parse.Query testing', () => {
   });
 
   it("order by updatedAt", function(done) {
-    var makeBoxedNumber = function(i) { return new BoxedNumber({ number: i }); };
-    var numbers = [3, 1, 2].map(makeBoxedNumber);
+    const makeBoxedNumber = function(i) { return new BoxedNumber({ number: i }); };
+    const numbers = [3, 1, 2].map(makeBoxedNumber);
     numbers[0].save().then(() => {
       return numbers[1].save();
     }).then(() => {
@@ -1252,7 +1889,7 @@ describe('Parse.Query testing', () => {
       numbers[1].set("number", 4);
       numbers[1].save(null, {
         success: function() {
-          var query = new Parse.Query(BoxedNumber);
+          const query = new Parse.Query(BoxedNumber);
           query.descending("_updated_at");
           query.find({
             success: function(results) {
@@ -1270,16 +1907,16 @@ describe('Parse.Query testing', () => {
 
   // Returns a promise
   function makeTimeObject(start, i) {
-    var time = new Date();
+    const time = new Date();
     time.setSeconds(start.getSeconds() + i);
-    var item = new TestObject({name: "item" + i, time: time});
+    const item = new TestObject({name: "item" + i, time: time});
     return item.save();
   }
 
   // Returns a promise for all the time objects
   function makeThreeTimeObjects() {
-    var start = new Date();
-    var one, two, three;
+    const start = new Date();
+    let one, two, three;
     return makeTimeObject(start, 1).then((o1) => {
       one = o1;
       return makeTimeObject(start, 2);
@@ -1294,7 +1931,7 @@ describe('Parse.Query testing', () => {
 
   it("time equality", function(done) {
     makeThreeTimeObjects().then(function(list) {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.equalTo("time", list[1].get("time"));
       query.find({
         success: function(results) {
@@ -1308,7 +1945,7 @@ describe('Parse.Query testing', () => {
 
   it("time lessThan", function(done) {
     makeThreeTimeObjects().then(function(list) {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.lessThan("time", list[2].get("time"));
       query.find({
         success: function(results) {
@@ -1322,7 +1959,7 @@ describe('Parse.Query testing', () => {
   // This test requires Date objects to be consistently stored as a Date.
   it("time createdAt", function(done) {
     makeThreeTimeObjects().then(function(list) {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.greaterThanOrEqualTo("createdAt", list[0].createdAt);
       query.find({
         success: function(results) {
@@ -1334,12 +1971,12 @@ describe('Parse.Query testing', () => {
   });
 
   it("matches string", function(done) {
-    var thing1 = new TestObject();
+    const thing1 = new TestObject();
     thing1.set("myString", "football");
-    var thing2 = new TestObject();
+    const thing2 = new TestObject();
     thing2.set("myString", "soccer");
     Parse.Object.saveAll([thing1, thing2], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.matches("myString", "^fo*\\wb[^o]l+$");
       query.find({
         success: function(results) {
@@ -1351,12 +1988,12 @@ describe('Parse.Query testing', () => {
   });
 
   it("matches regex", function(done) {
-    var thing1 = new TestObject();
+    const thing1 = new TestObject();
     thing1.set("myString", "football");
-    var thing2 = new TestObject();
+    const thing2 = new TestObject();
     thing2.set("myString", "soccer");
     Parse.Object.saveAll([thing1, thing2], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.matches("myString", /^fo*\wb[^o]l+$/);
       query.find({
         success: function(results) {
@@ -1368,10 +2005,10 @@ describe('Parse.Query testing', () => {
   });
 
   it("case insensitive regex success", function(done) {
-    var thing = new TestObject();
+    const thing = new TestObject();
     thing.set("myString", "football");
     Parse.Object.saveAll([thing], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.matches("myString", "FootBall", "i");
       query.find({
         success: function() {
@@ -1382,16 +2019,16 @@ describe('Parse.Query testing', () => {
   });
 
   it("regexes with invalid options fail", function(done) {
-    var query = new Parse.Query(TestObject);
+    const query = new Parse.Query(TestObject);
     query.matches("myString", "FootBall", "some invalid option");
     query.find(expectError(Parse.Error.INVALID_QUERY, done));
   });
 
   it("Use a regex that requires all modifiers", function(done) {
-    var thing = new TestObject();
+    const thing = new TestObject();
     thing.set("myString", "PArSe\nCom");
     Parse.Object.saveAll([thing], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.matches(
         "myString",
         "parse # First fragment. We'll write this in one case but match " +
@@ -1412,10 +2049,10 @@ describe('Parse.Query testing', () => {
   });
 
   it("Regular expression constructor includes modifiers inline", function(done) {
-    var thing = new TestObject();
+    const thing = new TestObject();
     thing.set("myString", "\n\nbuffer\n\nparse.COM");
     Parse.Object.saveAll([thing], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.matches("myString", /parse\.com/mi);
       query.find({
         success: function(results) {
@@ -1426,7 +2063,7 @@ describe('Parse.Query testing', () => {
     });
   });
 
-  var someAscii = "\\E' !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTU" +
+  const someAscii = "\\E' !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTU" +
     "VWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'";
 
   it("contains", function(done) {
@@ -1434,7 +2071,7 @@ describe('Parse.Query testing', () => {
       new TestObject({myString: "start" + someAscii}),
       new TestObject({myString: someAscii + "end"}),
       new TestObject({myString: someAscii})], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.contains("myString", someAscii);
       query.find({
         success: function(results) {
@@ -1467,7 +2104,7 @@ describe('Parse.Query testing', () => {
       new TestObject({myString: "start" + someAscii}),
       new TestObject({myString: someAscii + "end"}),
       new TestObject({myString: someAscii})], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.startsWith("myString", someAscii);
       query.find({
         success: function(results) {
@@ -1483,7 +2120,7 @@ describe('Parse.Query testing', () => {
       new TestObject({myString: "start" + someAscii}),
       new TestObject({myString: someAscii + "end"}),
       new TestObject({myString: someAscii})], function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.endsWith("myString", someAscii);
       query.find({
         success: function(results) {
@@ -1495,9 +2132,9 @@ describe('Parse.Query testing', () => {
   });
 
   it("exists", function(done) {
-    var objects = [];
-    for (var i of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
-      var item = new TestObject();
+    const objects = [];
+    for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
+      const item = new TestObject();
       if (i % 2 === 0) {
         item.set('x', i + 1);
       } else {
@@ -1506,12 +2143,12 @@ describe('Parse.Query testing', () => {
       objects.push(item);
     }
     Parse.Object.saveAll(objects, function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.exists("x");
       query.find({
         success: function(results) {
           equal(results.length, 5);
-          for (var result of results) {
+          for (const result of results) {
             ok(result.get("x"));
           }
           done();
@@ -1521,9 +2158,9 @@ describe('Parse.Query testing', () => {
   });
 
   it("doesNotExist", function(done) {
-    var objects = [];
-    for (var i of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
-      var item = new TestObject();
+    const objects = [];
+    for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
+      const item = new TestObject();
       if (i % 2 === 0) {
         item.set('x', i + 1);
       } else {
@@ -1532,12 +2169,12 @@ describe('Parse.Query testing', () => {
       objects.push(item);
     }
     Parse.Object.saveAll(objects, function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.doesNotExist("x");
       query.find({
         success: function(results) {
           equal(results.length, 4);
-          for (var result of results) {
+          for (const result of results) {
             ok(result.get("y"));
           }
           done();
@@ -1547,11 +2184,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("exists relation", function(done) {
-    var objects = [];
-    for (var i of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
-      var container = new Container();
+    const objects = [];
+    for (const i of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
+      const container = new Container();
       if (i % 2 === 0) {
-        var item = new TestObject();
+        const item = new TestObject();
         item.set('x', i);
         container.set('x', item);
         objects.push(item);
@@ -1561,12 +2198,12 @@ describe('Parse.Query testing', () => {
       objects.push(container);
     }
     Parse.Object.saveAll(objects).then(function() {
-      var query = new Parse.Query(Container);
+      const query = new Parse.Query(Container);
       query.exists("x");
       query.find({
         success: function(results) {
           equal(results.length, 5);
-          for (var result of results) {
+          for (const result of results) {
             ok(result.get("x"));
           }
           done();
@@ -1576,11 +2213,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("doesNotExist relation", function(done) {
-    var objects = [];
-    for (var i of [0, 1, 2, 3, 4, 5, 6, 7]) {
-      var container = new Container();
+    const objects = [];
+    for (const i of [0, 1, 2, 3, 4, 5, 6, 7]) {
+      const container = new Container();
       if (i % 2 === 0) {
-        var item = new TestObject();
+        const item = new TestObject();
         item.set('x', i);
         container.set('x', item);
         objects.push(item);
@@ -1590,12 +2227,12 @@ describe('Parse.Query testing', () => {
       objects.push(container);
     }
     Parse.Object.saveAll(objects, function() {
-      var query = new Parse.Query(Container);
+      const query = new Parse.Query(Container);
       query.doesNotExist("x");
       query.find({
         success: function(results) {
           equal(results.length, 4);
-          for (var result of results) {
+          for (const result of results) {
             ok(result.get("y"));
           }
           done();
@@ -1605,20 +2242,20 @@ describe('Parse.Query testing', () => {
   });
 
   it("don't include by default", function(done) {
-    var child = new TestObject();
-    var parent = new Container();
+    const child = new TestObject();
+    const parent = new Container();
     child.set("foo", "bar");
     parent.set("child", child);
     Parse.Object.saveAll([child, parent], function() {
       child._clearServerData();
-      var query = new Parse.Query(Container);
+      const query = new Parse.Query(Container);
       query.find({
         success: function(results) {
           equal(results.length, 1);
-          var parentAgain = results[0];
-          var goodURL = Parse.serverURL;
+          const parentAgain = results[0];
+          const goodURL = Parse.serverURL;
           Parse.serverURL = "YAAAAAAAAARRRRRGGGGGGGGG";
-          var childAgain = parentAgain.get("child");
+          const childAgain = parentAgain.get("child");
           ok(childAgain);
           equal(childAgain.get("foo"), undefined);
           Parse.serverURL = goodURL;
@@ -1629,20 +2266,20 @@ describe('Parse.Query testing', () => {
   });
 
   it("include relation", function(done) {
-    var child = new TestObject();
-    var parent = new Container();
+    const child = new TestObject();
+    const parent = new Container();
     child.set("foo", "bar");
     parent.set("child", child);
     Parse.Object.saveAll([child, parent], function() {
-      var query = new Parse.Query(Container);
+      const query = new Parse.Query(Container);
       query.include("child");
       query.find({
         success: function(results) {
           equal(results.length, 1);
-          var parentAgain = results[0];
-          var goodURL = Parse.serverURL;
+          const parentAgain = results[0];
+          const goodURL = Parse.serverURL;
           Parse.serverURL = "YAAAAAAAAARRRRRGGGGGGGGG";
-          var childAgain = parentAgain.get("child");
+          const childAgain = parentAgain.get("child");
           ok(childAgain);
           equal(childAgain.get("foo"), "bar");
           Parse.serverURL = goodURL;
@@ -1653,20 +2290,20 @@ describe('Parse.Query testing', () => {
   });
 
   it("include relation array", function(done) {
-    var child = new TestObject();
-    var parent = new Container();
+    const child = new TestObject();
+    const parent = new Container();
     child.set("foo", "bar");
     parent.set("child", child);
     Parse.Object.saveAll([child, parent], function() {
-      var query = new Parse.Query(Container);
+      const query = new Parse.Query(Container);
       query.include(["child"]);
       query.find({
         success: function(results) {
           equal(results.length, 1);
-          var parentAgain = results[0];
-          var goodURL = Parse.serverURL;
+          const parentAgain = results[0];
+          const goodURL = Parse.serverURL;
           Parse.serverURL = "YAAAAAAAAARRRRRGGGGGGGGG";
-          var childAgain = parentAgain.get("child");
+          const childAgain = parentAgain.get("child");
           ok(childAgain);
           equal(childAgain.get("foo"), "bar");
           Parse.serverURL = goodURL;
@@ -1677,12 +2314,12 @@ describe('Parse.Query testing', () => {
   });
 
   it("nested include", function(done) {
-    var Child = Parse.Object.extend("Child");
-    var Parent = Parse.Object.extend("Parent");
-    var Grandparent = Parse.Object.extend("Grandparent");
-    var objects = [];
-    for (var i = 0; i < 5; ++i) {
-      var grandparent = new Grandparent({
+    const Child = Parse.Object.extend("Child");
+    const Parent = Parse.Object.extend("Parent");
+    const Grandparent = Parse.Object.extend("Grandparent");
+    const objects = [];
+    for (let i = 0; i < 5; ++i) {
+      const grandparent = new Grandparent({
         z:i,
         parent: new Parent({
           y:i,
@@ -1695,12 +2332,12 @@ describe('Parse.Query testing', () => {
     }
 
     Parse.Object.saveAll(objects, function() {
-      var query = new Parse.Query(Grandparent);
+      const query = new Parse.Query(Grandparent);
       query.include(["parent.child"]);
       query.find({
         success: function(results) {
           equal(results.length, 5);
-          for (var object of results) {
+          for (const object of results) {
             equal(object.get("z"), object.get("parent").get("y"));
             equal(object.get("z"), object.get("parent").get("child").get("x"));
           }
@@ -1711,21 +2348,21 @@ describe('Parse.Query testing', () => {
   });
 
   it("include doesn't make dirty wrong", function(done) {
-    var Parent = Parse.Object.extend("ParentObject");
-    var Child = Parse.Object.extend("ChildObject");
-    var parent = new Parent();
-    var child = new Child();
+    const Parent = Parse.Object.extend("ParentObject");
+    const Child = Parse.Object.extend("ChildObject");
+    const parent = new Parent();
+    const child = new Child();
     child.set("foo", "bar");
     parent.set("child", child);
 
     Parse.Object.saveAll([child, parent], function() {
-      var query = new Parse.Query(Parent);
+      const query = new Parse.Query(Parent);
       query.include("child");
       query.find({
         success: function(results) {
           equal(results.length, 1);
-          var parentAgain = results[0];
-          var childAgain = parentAgain.get("child");
+          const parentAgain = results[0];
+          const childAgain = parentAgain.get("child");
           equal(childAgain.id, child.id);
           equal(parentAgain.id, parent.id);
           equal(childAgain.get("foo"), "bar");
@@ -1825,7 +2462,7 @@ describe('Parse.Query testing', () => {
     }
     Parse.Object.saveAll(objects).then(() => {
       const object = new Parse.Object("AContainer");
-      for (var i = 0; i < objects.length; i++) {
+      for (let  i = 0; i < objects.length; i++) {
         if (i % 2 == 0) {
           objects[i].id = 'randomThing'
         } else {
@@ -1886,16 +2523,16 @@ describe('Parse.Query testing', () => {
   });
 
   it("result object creation uses current extension", function(done) {
-    var ParentObject = Parse.Object.extend({ className: "ParentObject" });
+    const ParentObject = Parse.Object.extend({ className: "ParentObject" });
     // Add a foo() method to ChildObject.
-    var ChildObject = Parse.Object.extend("ChildObject", {
+    let ChildObject = Parse.Object.extend("ChildObject", {
       foo: function() {
         return "foo";
       }
     });
 
-    var parent = new ParentObject();
-    var child = new ChildObject();
+    const parent = new ParentObject();
+    const child = new ChildObject();
     parent.set("child", child);
     Parse.Object.saveAll([child, parent], function() {
       // Add a bar() method to ChildObject.
@@ -1905,13 +2542,13 @@ describe('Parse.Query testing', () => {
         }
       });
 
-      var query = new Parse.Query(ParentObject);
+      const query = new Parse.Query(ParentObject);
       query.include("child");
       query.find({
         success: function(results) {
           equal(results.length, 1);
-          var parentAgain = results[0];
-          var childAgain = parentAgain.get("child");
+          const parentAgain = results[0];
+          const childAgain = parentAgain.get("child");
           equal(childAgain.foo(), "foo");
           equal(childAgain.bar(), "bar");
           done();
@@ -1921,10 +2558,10 @@ describe('Parse.Query testing', () => {
   });
 
   it("matches query", function(done) {
-    var ParentObject = Parse.Object.extend("ParentObject");
-    var ChildObject = Parse.Object.extend("ChildObject");
-    var objects = [];
-    for (var i = 0; i < 10; ++i) {
+    const ParentObject = Parse.Object.extend("ParentObject");
+    const ChildObject = Parse.Object.extend("ChildObject");
+    const objects = [];
+    for (let  i = 0; i < 10; ++i) {
       objects.push(
         new ParentObject({
           child: new ChildObject({x: i}),
@@ -1932,22 +2569,22 @@ describe('Parse.Query testing', () => {
         }));
     }
     Parse.Object.saveAll(objects, function() {
-      var subQuery = new Parse.Query(ChildObject);
+      const subQuery = new Parse.Query(ChildObject);
       subQuery.greaterThan("x", 5);
-      var query = new Parse.Query(ParentObject);
+      const query = new Parse.Query(ParentObject);
       query.matchesQuery("child", subQuery);
       query.find({
         success: function(results) {
           equal(results.length, 4);
-          for (var object of results) {
+          for (const object of results) {
             ok(object.get("x") > 15);
           }
-          var query = new Parse.Query(ParentObject);
+          const query = new Parse.Query(ParentObject);
           query.doesNotMatchQuery("child", subQuery);
           query.find({
             success: function (results) {
               equal(results.length, 6);
-              for (var object of results) {
+              for (const object of results) {
                 ok(object.get("x") >= 10);
                 ok(object.get("x") <= 15);
                 done();
@@ -1960,9 +2597,9 @@ describe('Parse.Query testing', () => {
   });
 
   it("select query", function(done) {
-    var RestaurantObject = Parse.Object.extend("Restaurant");
-    var PersonObject = Parse.Object.extend("Person");
-    var objects = [
+    const RestaurantObject = Parse.Object.extend("Restaurant");
+    const PersonObject = Parse.Object.extend("Person");
+    const objects = [
       new RestaurantObject({ ratings: 5, location: "Djibouti" }),
       new RestaurantObject({ ratings: 3, location: "Ouagadougou" }),
       new PersonObject({ name: "Bob", hometown: "Djibouti" }),
@@ -1971,9 +2608,9 @@ describe('Parse.Query testing', () => {
     ];
 
     Parse.Object.saveAll(objects, function() {
-      var query = new Parse.Query(RestaurantObject);
+      const query = new Parse.Query(RestaurantObject);
       query.greaterThan("ratings", 4);
-      var mainQuery = new Parse.Query(PersonObject);
+      const mainQuery = new Parse.Query(PersonObject);
       mainQuery.matchesKeyInQuery("hometown", "location", query);
       mainQuery.find(expectSuccess({
         success: function(results) {
@@ -1986,9 +2623,9 @@ describe('Parse.Query testing', () => {
   });
 
   it('$select inside $or', (done) => {
-    var Restaurant = Parse.Object.extend('Restaurant');
-    var Person = Parse.Object.extend('Person');
-    var objects = [
+    const Restaurant = Parse.Object.extend('Restaurant');
+    const Person = Parse.Object.extend('Person');
+    const objects = [
       new Restaurant({ ratings: 5, location: "Djibouti" }),
       new Restaurant({ ratings: 3, location: "Ouagadougou" }),
       new Person({ name: "Bob", hometown: "Djibouti" }),
@@ -1997,13 +2634,13 @@ describe('Parse.Query testing', () => {
     ];
 
     Parse.Object.saveAll(objects).then(() => {
-      var subquery = new Parse.Query(Restaurant);
+      const subquery = new Parse.Query(Restaurant);
       subquery.greaterThan('ratings', 4);
-      var query1 = new Parse.Query(Person);
+      const query1 = new Parse.Query(Person);
       query1.matchesKeyInQuery('hometown', 'location', subquery);
-      var query2 = new Parse.Query(Person);
+      const query2 = new Parse.Query(Person);
       query2.equalTo('name', 'Tom');
-      var query = Parse.Query.or(query1, query2);
+      const query = Parse.Query.or(query1, query2);
       return query.find();
     }).then((results) => {
       expect(results.length).toEqual(2);
@@ -2014,10 +2651,67 @@ describe('Parse.Query testing', () => {
     });
   });
 
+  it('$nor valid query', (done) => {
+    const objects = Array.from(Array(10).keys()).map((rating) => {
+      return new TestObject({ 'rating': rating });
+    });
+
+    const highValue = 5;
+    const lowValue = 3;
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: {
+          $nor: [
+            { rating : { $gt : highValue } },
+            { rating : { $lte : lowValue } },
+          ]
+        },
+      }
+    });
+
+    Parse.Object.saveAll(objects).then(() => {
+      return rp.get(Parse.serverURL + "/classes/TestObject", options);
+    }).then((results) => {
+      expect(results.results.length).toBe(highValue - lowValue);
+      expect(results.results.every(res => res.rating > lowValue && res.rating <= highValue)).toBe(true);
+      done();
+    });
+  });
+
+  it('$nor invalid query - empty array', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: { $nor: [] },
+      }
+    });
+    const obj = new TestObject();
+    obj.save().then(() => {
+      return rp.get(Parse.serverURL + "/classes/TestObject", options);
+    }).then(done.fail).catch((error) => {
+      equal(error.error.code, Parse.Error.INVALID_QUERY);
+      done();
+    });
+  });
+
+  it('$nor invalid query - wrong type', (done) => {
+    const options = Object.assign({}, masterKeyOptions, {
+      body: {
+        where: { $nor: 1337 },
+      }
+    });
+    const obj = new TestObject();
+    obj.save().then(() => {
+      return rp.get(Parse.serverURL + "/classes/TestObject", options);
+    }).then(done.fail).catch((error) => {
+      equal(error.error.code, Parse.Error.INVALID_QUERY);
+      done();
+    });
+  });
+
   it("dontSelect query", function(done) {
-    var RestaurantObject = Parse.Object.extend("Restaurant");
-    var PersonObject = Parse.Object.extend("Person");
-    var objects = [
+    const RestaurantObject = Parse.Object.extend("Restaurant");
+    const PersonObject = Parse.Object.extend("Person");
+    const objects = [
       new RestaurantObject({ ratings: 5, location: "Djibouti" }),
       new RestaurantObject({ ratings: 3, location: "Ouagadougou" }),
       new PersonObject({ name: "Bob", hometown: "Djibouti" }),
@@ -2026,9 +2720,9 @@ describe('Parse.Query testing', () => {
     ];
 
     Parse.Object.saveAll(objects, function() {
-      var query = new Parse.Query(RestaurantObject);
+      const query = new Parse.Query(RestaurantObject);
       query.greaterThan("ratings", 4);
-      var mainQuery = new Parse.Query(PersonObject);
+      const mainQuery = new Parse.Query(PersonObject);
       mainQuery.doesNotMatchKeyInQuery("hometown", "location", query);
       mainQuery.find(expectSuccess({
         success: function(results) {
@@ -2064,19 +2758,19 @@ describe('Parse.Query testing', () => {
   });
 
   it("equalTo on same column as $dontSelect should not break $dontSelect functionality (#3678)", function(done) {
-    var AuthorObject = Parse.Object.extend("Author");
-    var BlockedObject = Parse.Object.extend("Blocked");
-    var PostObject = Parse.Object.extend("Post");
+    const AuthorObject = Parse.Object.extend("Author");
+    const BlockedObject = Parse.Object.extend("Blocked");
+    const PostObject = Parse.Object.extend("Post");
 
-    var postAuthor = null;
-    var requestUser = null;
+    let postAuthor = null;
+    let requestUser = null;
 
     return new AuthorObject({ name: "Julius"}).save().then((user) => {
       postAuthor = user;
       return new AuthorObject({ name: "Bob"}).save();
     }).then((user) => {
       requestUser = user;
-      var objects = [
+      const objects = [
         new PostObject({ author: postAuthor, title: "Lorem ipsum" }),
         new PostObject({ author: requestUser, title: "Kafka" }),
         new PostObject({ author: requestUser, title: "Brown fox" }),
@@ -2084,7 +2778,7 @@ describe('Parse.Query testing', () => {
       ];
       return Parse.Object.saveAll(objects);
     }).then(() => {
-      var banListQuery = new Parse.Query(BlockedObject);
+      const banListQuery = new Parse.Query(BlockedObject);
       banListQuery.equalTo("blockedUser", requestUser);
 
       return new Parse.Query(PostObject)
@@ -2099,9 +2793,9 @@ describe('Parse.Query testing', () => {
   });
 
   it("multiple dontSelect query", function(done) {
-    var RestaurantObject = Parse.Object.extend("Restaurant");
-    var PersonObject = Parse.Object.extend("Person");
-    var objects = [
+    const RestaurantObject = Parse.Object.extend("Restaurant");
+    const PersonObject = Parse.Object.extend("Person");
+    const objects = [
       new RestaurantObject({ ratings: 7, location: "Djibouti2" }),
       new RestaurantObject({ ratings: 5, location: "Djibouti" }),
       new RestaurantObject({ ratings: 3, location: "Ouagadougou" }),
@@ -2111,15 +2805,15 @@ describe('Parse.Query testing', () => {
     ];
 
     Parse.Object.saveAll(objects, function() {
-      var query = new Parse.Query(RestaurantObject);
+      const query = new Parse.Query(RestaurantObject);
       query.greaterThan("ratings", 6);
-      var query2 = new Parse.Query(RestaurantObject);
+      const query2 = new Parse.Query(RestaurantObject);
       query2.lessThan("ratings", 4);
-      var subQuery = new Parse.Query(PersonObject);
+      const subQuery = new Parse.Query(PersonObject);
       subQuery.matchesKeyInQuery("hometown", "location", query);
-      var subQuery2 = new Parse.Query(PersonObject);
+      const subQuery2 = new Parse.Query(PersonObject);
       subQuery2.matchesKeyInQuery("hometown", "location", query2);
-      var mainQuery = new Parse.Query(PersonObject);
+      const mainQuery = new Parse.Query(PersonObject);
       mainQuery.doesNotMatchKeyInQuery("objectId", "objectId", Parse.Query.or(subQuery, subQuery2));
       mainQuery.find(expectSuccess({
         success: function(results) {
@@ -2132,13 +2826,13 @@ describe('Parse.Query testing', () => {
   });
 
   it("object with length", function(done) {
-    var TestObject = Parse.Object.extend("TestObject");
-    var obj = new TestObject();
+    const TestObject = Parse.Object.extend("TestObject");
+    const obj = new TestObject();
     obj.set("length", 5);
     equal(obj.get("length"), 5);
     obj.save(null, {
       success: function() {
-        var query = new Parse.Query(TestObject);
+        const query = new Parse.Query(TestObject);
         query.find({
           success: function(results) {
             equal(results.length, 1);
@@ -2161,13 +2855,13 @@ describe('Parse.Query testing', () => {
   it("include user", function(done) {
     Parse.User.signUp("bob", "password", { age: 21 }, {
       success: function(user) {
-        var TestObject = Parse.Object.extend("TestObject");
-        var obj = new TestObject();
+        const TestObject = Parse.Object.extend("TestObject");
+        const obj = new TestObject();
         obj.save({
           owner: user
         }, {
           success: function(obj) {
-            var query = new Parse.Query(TestObject);
+            const query = new Parse.Query(TestObject);
             query.include("owner");
             query.get(obj.id, {
               success: function(objAgain) {
@@ -2196,22 +2890,22 @@ describe('Parse.Query testing', () => {
   });
 
   it("or queries", function(done) {
-    var objects = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(x) {
-      var object = new Parse.Object('BoxedNumber');
+    const objects = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(x) {
+      const object = new Parse.Object('BoxedNumber');
       object.set('x', x);
       return object;
     });
     Parse.Object.saveAll(objects, expectSuccess({
       success: function() {
-        var query1 = new Parse.Query('BoxedNumber');
+        const query1 = new Parse.Query('BoxedNumber');
         query1.lessThan('x', 2);
-        var query2 = new Parse.Query('BoxedNumber');
+        const query2 = new Parse.Query('BoxedNumber');
         query2.greaterThan('x', 5);
-        var orQuery = Parse.Query.or(query1, query2);
+        const orQuery = Parse.Query.or(query1, query2);
         orQuery.find(expectSuccess({
           success: function(results) {
             equal(results.length, 6);
-            for (var number of results) {
+            for (const number of results) {
               ok(number.get('x') < 2 || number.get('x') > 5);
             }
             done();
@@ -2223,10 +2917,10 @@ describe('Parse.Query testing', () => {
 
   // This relies on matchesQuery aka the $inQuery operator
   it("or complex queries", function(done) {
-    var objects = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(x) {
-      var child = new Parse.Object('Child');
+    const objects = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(x) {
+      const child = new Parse.Object('Child');
       child.set('x', x);
-      var parent = new Parse.Object('Parent');
+      const parent = new Parse.Object('Parent');
       parent.set('child', child);
       parent.set('y', x);
       return parent;
@@ -2234,13 +2928,13 @@ describe('Parse.Query testing', () => {
 
     Parse.Object.saveAll(objects, expectSuccess({
       success: function() {
-        var subQuery = new Parse.Query('Child');
+        const subQuery = new Parse.Query('Child');
         subQuery.equalTo('x', 4);
-        var query1 = new Parse.Query('Parent');
+        const query1 = new Parse.Query('Parent');
         query1.matchesQuery('child', subQuery);
-        var query2 = new Parse.Query('Parent');
+        const query2 = new Parse.Query('Parent');
         query2.lessThan('y', 2);
-        var orQuery = Parse.Query.or(query1, query2);
+        const orQuery = Parse.Query.or(query1, query2);
         orQuery.find(expectSuccess({
           success: function(results) {
             equal(results.length, 3);
@@ -2252,31 +2946,31 @@ describe('Parse.Query testing', () => {
   });
 
   it("async methods", function(done) {
-    var saves = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(x) {
-      var obj = new Parse.Object("TestObject");
+    const saves = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(function(x) {
+      const obj = new Parse.Object("TestObject");
       obj.set("x", x + 1);
       return obj.save();
     });
 
     Parse.Promise.when(saves).then(function() {
-      var query = new Parse.Query("TestObject");
+      const query = new Parse.Query("TestObject");
       query.ascending("x");
       return query.first();
 
     }).then(function(obj) {
       equal(obj.get("x"), 1);
-      var query = new Parse.Query("TestObject");
+      const query = new Parse.Query("TestObject");
       query.descending("x");
       return query.find();
 
     }).then(function(results) {
       equal(results.length, 10);
-      var query = new Parse.Query("TestObject");
+      const query = new Parse.Query("TestObject");
       return query.get(results[0].id);
 
     }).then(function(obj1) {
       equal(obj1.get("x"), 10);
-      var query = new Parse.Query("TestObject");
+      const query = new Parse.Query("TestObject");
       return query.count();
 
     }).then(function(count) {
@@ -2289,20 +2983,20 @@ describe('Parse.Query testing', () => {
   });
 
   it("query.each", function(done) {
-    var TOTAL = 50;
-    var COUNT = 25;
+    const TOTAL = 50;
+    const COUNT = 25;
 
-    var items = range(TOTAL).map(function(x) {
-      var obj = new TestObject();
+    const items = range(TOTAL).map(function(x) {
+      const obj = new TestObject();
       obj.set("x", x);
       return obj;
     });
 
     Parse.Object.saveAll(items).then(function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.lessThan("x", COUNT);
 
-      var seen = [];
+      const seen = [];
       query.each(function(obj) {
         seen[obj.get("x")] = (seen[obj.get("x")] || 0) + 1;
 
@@ -2310,7 +3004,7 @@ describe('Parse.Query testing', () => {
         batchSize: 10,
         success: function() {
           equal(seen.length, COUNT);
-          for (var i = 0; i < COUNT; i++) {
+          for (let  i = 0; i < COUNT; i++) {
             equal(seen[i], 1, "Should have seen object number " + i);
           }
           done();
@@ -2324,24 +3018,24 @@ describe('Parse.Query testing', () => {
   });
 
   it("query.each async", function(done) {
-    var TOTAL = 50;
-    var COUNT = 25;
+    const TOTAL = 50;
+    const COUNT = 25;
 
     expect(COUNT + 1);
 
-    var items = range(TOTAL).map(function(x) {
-      var obj = new TestObject();
+    const items = range(TOTAL).map(function(x) {
+      const obj = new TestObject();
       obj.set("x", x);
       return obj;
     });
 
-    var seen = [];
+    const seen = [];
 
     Parse.Object.saveAll(items).then(function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.lessThan("x", COUNT);
       return query.each(function(obj) {
-        var promise = new Parse.Promise();
+        const promise = new Parse.Promise();
         process.nextTick(function() {
           seen[obj.get("x")] = (seen[obj.get("x")] || 0) + 1;
           promise.resolve();
@@ -2353,7 +3047,7 @@ describe('Parse.Query testing', () => {
 
     }).then(function() {
       equal(seen.length, COUNT);
-      for (var i = 0; i < COUNT; i++) {
+      for (let  i = 0; i < COUNT; i++) {
         equal(seen[i], 1, "Should have seen object number " + i);
       }
       done();
@@ -2361,19 +3055,19 @@ describe('Parse.Query testing', () => {
   });
 
   it("query.each fails with order", function(done) {
-    var TOTAL = 50;
-    var COUNT = 25;
+    const TOTAL = 50;
+    const COUNT = 25;
 
-    var items = range(TOTAL).map(function(x) {
-      var obj = new TestObject();
+    const items = range(TOTAL).map(function(x) {
+      const obj = new TestObject();
       obj.set("x", x);
       return obj;
     });
 
-    var seen = [];
+    const seen = [];
 
     Parse.Object.saveAll(items).then(function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.lessThan("x", COUNT);
       query.ascending("x");
       return query.each(function(obj) {
@@ -2389,19 +3083,19 @@ describe('Parse.Query testing', () => {
   });
 
   it("query.each fails with skip", function(done) {
-    var TOTAL = 50;
-    var COUNT = 25;
+    const TOTAL = 50;
+    const COUNT = 25;
 
-    var items = range(TOTAL).map(function(x) {
-      var obj = new TestObject();
+    const items = range(TOTAL).map(function(x) {
+      const obj = new TestObject();
       obj.set("x", x);
       return obj;
     });
 
-    var seen = [];
+    const seen = [];
 
     Parse.Object.saveAll(items).then(function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.lessThan("x", COUNT);
       query.skip(5);
       return query.each(function(obj) {
@@ -2417,21 +3111,21 @@ describe('Parse.Query testing', () => {
   });
 
   it("query.each fails with limit", function(done) {
-    var TOTAL = 50;
-    var COUNT = 25;
+    const TOTAL = 50;
+    const COUNT = 25;
 
     expect(0);
 
-    var items = range(TOTAL).map(function(x) {
-      var obj = new TestObject();
+    const items = range(TOTAL).map(function(x) {
+      const obj = new TestObject();
       obj.set("x", x);
       return obj;
     });
 
-    var seen = [];
+    const seen = [];
 
     Parse.Object.saveAll(items).then(function() {
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.lessThan("x", COUNT);
       query.limit(5);
       return query.each(function(obj) {
@@ -2447,11 +3141,11 @@ describe('Parse.Query testing', () => {
   });
 
   it("select keys query", function(done) {
-    var obj = new TestObject({ foo: 'baz', bar: 1 });
+    const obj = new TestObject({ foo: 'baz', bar: 1 });
 
     obj.save().then(function () {
       obj._clearServerData();
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.select('foo');
       return query.first();
     }).then(function(result) {
@@ -2468,7 +3162,7 @@ describe('Parse.Query testing', () => {
       strictEqual(result.get('bar'), 1);
     }).then(function() {
       obj._clearServerData();
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.select([]);
       return query.first();
     }).then(function(result) {
@@ -2480,7 +3174,7 @@ describe('Parse.Query testing', () => {
         "expected 'bar' field to be unset");
     }).then(function() {
       obj._clearServerData();
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.select(['foo','bar']);
       return query.first();
     }).then(function(result) {
@@ -2490,7 +3184,7 @@ describe('Parse.Query testing', () => {
       strictEqual(result.get('bar'), 1);
     }).then(function() {
       obj._clearServerData();
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.select('foo', 'bar');
       return query.first();
     }).then(function(result) {
@@ -2507,11 +3201,11 @@ describe('Parse.Query testing', () => {
   });
 
   it('select keys with each query', function(done) {
-    var obj = new TestObject({ foo: 'baz', bar: 1 });
+    const obj = new TestObject({ foo: 'baz', bar: 1 });
 
     obj.save().then(function() {
       obj._clearServerData();
-      var query = new Parse.Query(TestObject);
+      const query = new Parse.Query(TestObject);
       query.select('foo');
       query.each(function(result) {
         ok(result.id, 'expected object id to be set');
@@ -2531,14 +3225,14 @@ describe('Parse.Query testing', () => {
   });
 
   it('notEqual with array of pointers', (done) => {
-    var children = [];
-    var parents = [];
-    var promises = [];
-    for (var i = 0; i < 2; i++) {
-      var proc = (iter) => {
-        var child = new Parse.Object('Child');
+    const children = [];
+    const parents = [];
+    const promises = [];
+    for (let  i = 0; i < 2; i++) {
+      const proc = (iter) => {
+        const child = new Parse.Object('Child');
         children.push(child);
-        var parent = new Parse.Object('Parent');
+        const parent = new Parse.Object('Parent');
         parents.push(parent);
         promises.push(
           child.save().then(() => {
@@ -2550,7 +3244,7 @@ describe('Parse.Query testing', () => {
       proc(i);
     }
     Promise.all(promises).then(() => {
-      var query = new Parse.Query('Parent');
+      const query = new Parse.Query('Parent');
       query.notEqualTo('child', children[0]);
       return query.find();
     }).then((results) => {
@@ -2562,10 +3256,10 @@ describe('Parse.Query testing', () => {
 
   // PG don't support creating a null column
   it_exclude_dbs(['postgres'])('querying for null value', (done) => {
-    var obj = new Parse.Object('TestObject');
+    const obj = new Parse.Object('TestObject');
     obj.set('aNull', null);
     obj.save().then(() => {
-      var query = new Parse.Query('TestObject');
+      const query = new Parse.Query('TestObject');
       query.equalTo('aNull', null);
       return query.find();
     }).then((results) => {
@@ -2576,17 +3270,17 @@ describe('Parse.Query testing', () => {
   });
 
   it('query within dictionary', (done) => {
-    var promises = [];
-    for (var i = 0; i < 2; i++) {
-      var proc = (iter) => {
-        var obj = new Parse.Object('TestObject');
+    const promises = [];
+    for (let  i = 0; i < 2; i++) {
+      const proc = (iter) => {
+        const obj = new Parse.Object('TestObject');
         obj.set('aDict', { x: iter + 1, y: iter + 2 });
         promises.push(obj.save());
       };
       proc(i);
     }
     Promise.all(promises).then(() => {
-      var query = new Parse.Query('TestObject');
+      const query = new Parse.Query('TestObject');
       query.equalTo('aDict.x', 1);
       return query.find();
     }).then((results) => {
@@ -2624,11 +3318,11 @@ describe('Parse.Query testing', () => {
   });
 
   it('query match on array with single object', (done) => {
-    var target = {__type: 'Pointer', className: 'TestObject', objectId: 'abc123'};
-    var obj = new Parse.Object('TestObject');
+    const target = {__type: 'Pointer', className: 'TestObject', objectId: 'abc123'};
+    const obj = new Parse.Object('TestObject');
     obj.set('someObjs', [target]);
     obj.save().then(() => {
-      var query = new Parse.Query('TestObject');
+      const query = new Parse.Query('TestObject');
       query.equalTo('someObjs', target);
       return query.find();
     }).then((results) => {
@@ -2640,12 +3334,12 @@ describe('Parse.Query testing', () => {
   });
 
   it('query match on array with multiple objects', (done) => {
-    var target1 = {__type: 'Pointer', className: 'TestObject', objectId: 'abc'};
-    var target2 = {__type: 'Pointer', className: 'TestObject', objectId: '123'};
-    var obj = new Parse.Object('TestObject');
+    const target1 = {__type: 'Pointer', className: 'TestObject', objectId: 'abc'};
+    const target2 = {__type: 'Pointer', className: 'TestObject', objectId: '123'};
+    const obj = new Parse.Object('TestObject');
     obj.set('someObjs', [target1, target2]);
     obj.save().then(() => {
-      var query = new Parse.Query('TestObject');
+      const query = new Parse.Query('TestObject');
       query.equalTo('someObjs', target1);
       return query.find();
     }).then((results) => {
@@ -2657,12 +3351,12 @@ describe('Parse.Query testing', () => {
   });
 
   it('query should not match on array when searching for null', (done) => {
-    var target = {__type: 'Pointer', className: 'TestObject', objectId: '123'};
-    var obj = new Parse.Object('TestObject');
+    const target = {__type: 'Pointer', className: 'TestObject', objectId: '123'};
+    const obj = new Parse.Object('TestObject');
     obj.set('someKey', 'someValue');
     obj.set('someObjs', [target]);
     obj.save().then(() => {
-      var query = new Parse.Query('TestObject');
+      const query = new Parse.Query('TestObject');
       query.equalTo('someKey', 'someValue');
       query.equalTo('someObjs', null);
       return query.find();
@@ -2676,8 +3370,8 @@ describe('Parse.Query testing', () => {
 
   // #371
   it('should properly interpret a query v1', (done) => {
-    var query = new Parse.Query("C1");
-    var auxQuery = new Parse.Query("C1");
+    const query = new Parse.Query("C1");
+    const auxQuery = new Parse.Query("C1");
     query.matchesKeyInQuery("A1", "A2", auxQuery);
     query.include("A3");
     query.include("A2");
@@ -2691,30 +3385,30 @@ describe('Parse.Query testing', () => {
   });
 
   it('should properly interpret a query v2', (done) => {
-    var user = new Parse.User();
+    const user = new Parse.User();
     user.set("username", "foo");
     user.set("password", "bar");
     return user.save().then((user) => {
-      var objIdQuery = new Parse.Query("_User").equalTo("objectId", user.id);
-      var blockedUserQuery = user.relation("blockedUsers").query();
+      const objIdQuery = new Parse.Query("_User").equalTo("objectId", user.id);
+      const blockedUserQuery = user.relation("blockedUsers").query();
 
-      var aResponseQuery = new Parse.Query("MatchRelationshipActivityResponse");
+      const aResponseQuery = new Parse.Query("MatchRelationshipActivityResponse");
       aResponseQuery.equalTo("userA", user);
       aResponseQuery.equalTo("userAResponse", 1);
 
-      var bResponseQuery = new Parse.Query("MatchRelationshipActivityResponse");
+      const bResponseQuery = new Parse.Query("MatchRelationshipActivityResponse");
       bResponseQuery.equalTo("userB", user);
       bResponseQuery.equalTo("userBResponse", 1);
 
-      var matchOr = Parse.Query.or(aResponseQuery, bResponseQuery);
-      var matchRelationshipA = new Parse.Query("_User");
+      const matchOr = Parse.Query.or(aResponseQuery, bResponseQuery);
+      const matchRelationshipA = new Parse.Query("_User");
       matchRelationshipA.matchesKeyInQuery("objectId", "userAObjectId", matchOr);
-      var matchRelationshipB = new Parse.Query("_User");
+      const matchRelationshipB = new Parse.Query("_User");
       matchRelationshipB.matchesKeyInQuery("objectId", "userBObjectId", matchOr);
 
 
-      var orQuery = Parse.Query.or(objIdQuery, blockedUserQuery, matchRelationshipA, matchRelationshipB);
-      var query = new Parse.Query("_User");
+      const orQuery = Parse.Query.or(objIdQuery, blockedUserQuery, matchRelationshipA, matchRelationshipB);
+      const query = new Parse.Query("_User");
       query.doesNotMatchQuery("objectId", orQuery);
       return query.find();
     }).then(() => {
@@ -2727,9 +3421,9 @@ describe('Parse.Query testing', () => {
   });
 
   it("should match a key in an array (#3195)", function(done) {
-    var AuthorObject = Parse.Object.extend("Author");
-    var GroupObject = Parse.Object.extend("Group");
-    var PostObject = Parse.Object.extend("Post");
+    const AuthorObject = Parse.Object.extend("Author");
+    const GroupObject = Parse.Object.extend("Group");
+    const PostObject = Parse.Object.extend("Post");
 
     return new AuthorObject().save().then((user) => {
       const post = new PostObject({
@@ -2756,16 +3450,16 @@ describe('Parse.Query testing', () => {
   });
 
   it('should find objects with array of pointers', (done) => {
-    var objects = [];
+    const objects = [];
     while(objects.length != 5) {
-      var object = new Parse.Object('ContainedObject');
+      const object = new Parse.Object('ContainedObject');
       object.set('index', objects.length);
       objects.push(object);
     }
 
     Parse.Object.saveAll(objects).then((objects) => {
-      var container = new Parse.Object('Container');
-      var pointers = objects.map((obj) => {
+      const container = new Parse.Object('Container');
+      const pointers = objects.map((obj) => {
         return {
           __type: 'Pointer',
           className: 'ContainedObject',
@@ -2882,17 +3576,17 @@ describe('Parse.Query testing', () => {
   });
 
   it('include for specific object', function(done){
-    var child = new Parse.Object('Child');
-    var parent = new Parse.Object('Parent');
+    const child = new Parse.Object('Child');
+    const parent = new Parse.Object('Parent');
     child.set('foo', 'bar');
     parent.set('child', child);
     Parse.Object.saveAll([child, parent], function(response){
-      var savedParent = response[1];
-      var parentQuery = new Parse.Query('Parent');
+      const savedParent = response[1];
+      const parentQuery = new Parse.Query('Parent');
       parentQuery.include('child');
       parentQuery.get(savedParent.id, {
         success: function(parentObj) {
-          var childPointer = parentObj.get('child');
+          const childPointer = parentObj.get('child');
           ok(childPointer);
           equal(childPointer.get('foo'), 'bar');
           done();
@@ -2901,13 +3595,13 @@ describe('Parse.Query testing', () => {
     });
   });
 
-  it('select keys for specific object', function(done){
-    var Foobar = new Parse.Object('Foobar');
+  it('select keys for specific object', function(done) {
+    const Foobar = new Parse.Object('Foobar');
     Foobar.set('foo', 'bar');
     Foobar.set('fizz', 'buzz');
     Foobar.save({
       success: function(savedFoobar){
-        var foobarQuery = new Parse.Query('Foobar');
+        const foobarQuery = new Parse.Query('Foobar');
         foobarQuery.select('fizz');
         foobarQuery.get(savedFoobar.id,{
           success: function(foobarObj){
@@ -2921,8 +3615,8 @@ describe('Parse.Query testing', () => {
   });
 
   it('select nested keys (issue #1567)', function(done) {
-    var Foobar = new Parse.Object('Foobar');
-    var BarBaz = new Parse.Object('Barbaz');
+    const Foobar = new Parse.Object('Foobar');
+    const BarBaz = new Parse.Object('Barbaz');
     BarBaz.set('key', 'value');
     BarBaz.set('otherKey', 'value');
     BarBaz.save().then(() => {
@@ -2931,7 +3625,7 @@ describe('Parse.Query testing', () => {
       Foobar.set('barBaz', BarBaz);
       return Foobar.save();
     }).then(function(savedFoobar){
-      var foobarQuery = new Parse.Query('Foobar');
+      const foobarQuery = new Parse.Query('Foobar');
       foobarQuery.include('barBaz');
       foobarQuery.select(['fizz', 'barBaz.key']);
       foobarQuery.get(savedFoobar.id,{
@@ -2951,9 +3645,9 @@ describe('Parse.Query testing', () => {
   });
 
   it('select nested keys 2 level (issue #1567)', function(done) {
-    var Foobar = new Parse.Object('Foobar');
-    var BarBaz = new Parse.Object('Barbaz');
-    var Bazoo = new Parse.Object('Bazoo');
+    const Foobar = new Parse.Object('Foobar');
+    const BarBaz = new Parse.Object('Barbaz');
+    const Bazoo = new Parse.Object('Bazoo');
 
     Bazoo.set('some', 'thing');
     Bazoo.set('otherSome', 'value');
@@ -2968,7 +3662,7 @@ describe('Parse.Query testing', () => {
       Foobar.set('barBaz', BarBaz);
       return Foobar.save();
     }).then(function(savedFoobar){
-      var foobarQuery = new Parse.Query('Foobar');
+      const foobarQuery = new Parse.Query('Foobar');
       foobarQuery.include('barBaz');
       foobarQuery.include('barBaz.bazoo');
       foobarQuery.select(['fizz', 'barBaz.key', 'barBaz.bazoo.some']);
@@ -2990,10 +3684,79 @@ describe('Parse.Query testing', () => {
     });
   });
 
+  it('includeAll', (done) => {
+    const child1 = new TestObject({ foo: 'bar', name: 'ac' });
+    const child2 = new TestObject({ foo: 'baz', name: 'flo' });
+    const child3 = new TestObject({ foo: 'bad', name: 'mo' });
+    const parent = new Container({ child1, child2, child3 });
+    Parse.Object.saveAll([parent, child1, child2, child3]).then(() => {
+      const options = Object.assign({}, masterKeyOptions, {
+        body: {
+          where: { objectId: parent.id },
+          includeAll: true,
+        }
+      });
+      return rp.get(Parse.serverURL + "/classes/Container", options);
+    }).then((resp) => {
+      const result = resp.results[0];
+      equal(result.child1.foo, 'bar');
+      equal(result.child2.foo, 'baz');
+      equal(result.child3.foo, 'bad');
+      equal(result.child1.name, 'ac');
+      equal(result.child2.name, 'flo');
+      equal(result.child3.name, 'mo');
+      done();
+    });
+  });
+
+  it('select nested keys 2 level includeAll', (done) => {
+    const Foobar = new Parse.Object('Foobar');
+    const BarBaz = new Parse.Object('Barbaz');
+    const Bazoo = new Parse.Object('Bazoo');
+    const Tang = new Parse.Object('Tang');
+
+    Bazoo.set('some', 'thing');
+    Bazoo.set('otherSome', 'value');
+    Bazoo.save().then(() => {
+      BarBaz.set('key', 'value');
+      BarBaz.set('otherKey', 'value');
+      BarBaz.set('bazoo', Bazoo);
+      return BarBaz.save();
+    }).then(() => {
+      Tang.set('clan', 'wu');
+      return Tang.save();
+    }).then(() => {
+      Foobar.set('foo', 'bar');
+      Foobar.set('fizz', 'buzz');
+      Foobar.set('barBaz', BarBaz);
+      Foobar.set('group', Tang);
+      return Foobar.save();
+    }).then((savedFoobar) => {
+      const options = Object.assign({}, masterKeyOptions, {
+        body: {
+          where: { objectId: savedFoobar.id },
+          includeAll: true,
+          keys: 'fizz,barBaz.key,barBaz.bazoo.some',
+        }
+      });
+      return rp.get(Parse.serverURL + "/classes/Foobar", options);
+    }).then((resp) => {
+      const result = resp.results[0];
+      equal(result.group.clan, 'wu');
+      equal(result.foo, undefined);
+      equal(result.fizz, 'buzz');
+      equal(result.barBaz.key, 'value');
+      equal(result.barBaz.otherKey, undefined);
+      equal(result.barBaz.bazoo.some, 'thing');
+      equal(result.barBaz.bazoo.otherSome, undefined);
+      done();
+    })
+  });
+
   it('select nested keys 2 level without include (issue #3185)', function(done) {
-    var Foobar = new Parse.Object('Foobar');
-    var BarBaz = new Parse.Object('Barbaz');
-    var Bazoo = new Parse.Object('Bazoo');
+    const Foobar = new Parse.Object('Foobar');
+    const BarBaz = new Parse.Object('Barbaz');
+    const Bazoo = new Parse.Object('Bazoo');
 
     Bazoo.set('some', 'thing');
     Bazoo.set('otherSome', 'value');
@@ -3008,7 +3771,7 @@ describe('Parse.Query testing', () => {
       Foobar.set('barBaz', BarBaz);
       return Foobar.save();
     }).then(function(savedFoobar){
-      var foobarQuery = new Parse.Query('Foobar');
+      const foobarQuery = new Parse.Query('Foobar');
       foobarQuery.select(['fizz', 'barBaz.key', 'barBaz.bazoo.some']);
       return foobarQuery.get(savedFoobar.id);
     }).then((foobarObj) => {
@@ -3031,9 +3794,9 @@ describe('Parse.Query testing', () => {
   });
 
   it('properly handles nested ors', function(done) {
-    var objects = [];
+    const objects = [];
     while(objects.length != 4) {
-      var obj = new Parse.Object('Object');
+      const obj = new Parse.Object('Object');
       obj.set('x', objects.length);
       objects.push(obj)
     }
@@ -3291,4 +4054,106 @@ describe('Parse.Query testing', () => {
       })
   });
 
+  it('withJSON supports geoWithin.centerSphere', (done) => {
+    const inbound = new Parse.GeoPoint(1.5, 1.5);
+    const onbound = new Parse.GeoPoint(10, 10);
+    const outbound = new Parse.GeoPoint(20, 20);
+    const obj1 = new Parse.Object('TestObject', {location: inbound});
+    const obj2 = new Parse.Object('TestObject', {location: onbound});
+    const obj3 = new Parse.Object('TestObject', {location: outbound});
+    const center = new Parse.GeoPoint(0, 0);
+    const distanceInKilometers = 1569 + 1; // 1569km is the approximate distance between {0, 0} and {10, 10}.
+    Parse.Object.saveAll([obj1, obj2, obj3]).then(() => {
+      const q = new Parse.Query(TestObject);
+      const jsonQ = q.toJSON();
+      jsonQ.where.location = {
+        '$geoWithin': {
+          '$centerSphere': [
+            center,
+            distanceInKilometers / 6371.0
+          ]
+        }
+      };
+      q.withJSON(jsonQ);
+      return q.find();
+    }).then(results => {
+      equal(results.length, 2);
+      const q = new Parse.Query(TestObject);
+      const jsonQ = q.toJSON();
+      jsonQ.where.location = {
+        '$geoWithin': {
+          '$centerSphere': [
+            [0, 0],
+            distanceInKilometers / 6371.0
+          ]
+        }
+      };
+      q.withJSON(jsonQ);
+      return q.find();
+    }).then(results => {
+      equal(results.length, 2);
+      done();
+    }).catch(error => {
+      fail(error);
+      done();
+    });
+  });
+
+  it('withJSON with geoWithin.centerSphere fails without parameters', (done) => {
+    const q = new Parse.Query(TestObject);
+    const jsonQ = q.toJSON();
+    jsonQ.where.location = {
+      '$geoWithin': {
+        '$centerSphere': [
+        ]
+      }
+    };
+    q.withJSON(jsonQ);
+    q.find(expectError(Parse.Error.INVALID_JSON, done));
+  });
+
+  it('withJSON with geoWithin.centerSphere fails with invalid distance', (done) => {
+    const q = new Parse.Query(TestObject);
+    const jsonQ = q.toJSON();
+    jsonQ.where.location = {
+      '$geoWithin': {
+        '$centerSphere': [
+          [0, 0],
+          'invalid_distance'
+        ]
+      }
+    };
+    q.withJSON(jsonQ);
+    q.find(expectError(Parse.Error.INVALID_JSON, done));
+  });
+
+  it('withJSON with geoWithin.centerSphere fails with invalid coordinate', (done) => {
+    const q = new Parse.Query(TestObject);
+    const jsonQ = q.toJSON();
+    jsonQ.where.location = {
+      '$geoWithin': {
+        '$centerSphere': [
+          [-190,-190],
+          1
+        ]
+      }
+    };
+    q.withJSON(jsonQ);
+    q.find(expectError(undefined, done));
+  });
+
+  it('withJSON with geoWithin.centerSphere fails with invalid geo point', (done) => {
+    const q = new Parse.Query(TestObject);
+    const jsonQ = q.toJSON();
+    jsonQ.where.location = {
+      '$geoWithin': {
+        '$centerSphere': [
+          {'longitude': 0, 'dummytude': 0},
+          1
+        ]
+      }
+    };
+    q.withJSON(jsonQ);
+    q.find(expectError(undefined, done));
+  });
 });

@@ -64,6 +64,9 @@ export interface ParseServerOptions {
   webhookKey: ?string;
   /* Key for your files */
   fileKey: ?string;
+  /* Enable (or disable) the addition of a unique hash to the file names
+  :ENV: PARSE_SERVER_PRESERVE_FILE_NAME */
+  preserveFileName: ?boolean; // = false
   /* Personally identifiable information fields in the user table the should be removed for non-authorized users. */
   userSensitiveFields: ?string[]; // = ["email"]
   /* Enable (or disable) anon users, defaults to true
@@ -114,6 +117,8 @@ export interface ParseServerOptions {
   cacheMaxSize : ?number; // = 10000
   /* Use a single schema cache shared across requests. Reduces number of queries made to _SCHEMA. Defaults to false, i.e. unique schema cache per request. */
   enableSingleSchemaCache: ?boolean; // = false
+  /* Enables the default express error handler for all errors */
+  enableExpressErrorHandler: ?boolean; // = false
   /* Sets the number of characters in generated object id's, default 10 */
   objectIdSize: ?number; // = 10
   /* The port to run the ParseServer. defaults to 1337.
@@ -171,7 +176,7 @@ export interface LiveQueryServerOptions {
   cacheTimeout: ?number,
   /* This string defines the log level of the LiveQuery server. We support VERBOSE, INFO, ERROR, NONE. Defaults to INFO.*/
   logLevel: ?string,
-  /* The port to run the ParseServer. defaults to 1337.*/
+  /* The port to run the LiveQuery server. Defaults to 1337.*/
   port: ?number, // = 1337
   /* parse-server's LiveQuery redisURL */
   redisURL: ?string,

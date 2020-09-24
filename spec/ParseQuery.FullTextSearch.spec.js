@@ -1,8 +1,8 @@
 'use strict';
 
-import MongoStorageAdapter from '../src/Adapters/Storage/Mongo/MongoStorageAdapter';
+const MongoStorageAdapter = require('../lib/Adapters/Storage/Mongo/MongoStorageAdapter').default;
 const mongoURI = 'mongodb://localhost:27017/parseServerMongoAdapterTestDatabase';
-import PostgresStorageAdapter from '../src/Adapters/Storage/Postgres/PostgresStorageAdapter';
+const PostgresStorageAdapter = require('../lib/Adapters/Storage/Postgres/PostgresStorageAdapter').default;
 const postgresURI = 'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
 const Parse = require('parse/node');
 const rp = require('request-promise');
@@ -280,7 +280,7 @@ describe('Parse.Query Full Text Search testing', () => {
   });
 });
 
-describe_only_db('mongo')('Parse.Query Full Text Search testing', () => {
+describe_only_db('mongo')('[mongodb] Parse.Query Full Text Search testing', () => {
   it('fullTextSearch: does not create text index if compound index exist', (done) => {
     fullTextHelper().then(() => {
       return databaseAdapter.dropAllIndexes('TestObject');
@@ -451,7 +451,7 @@ describe_only_db('mongo')('Parse.Query Full Text Search testing', () => {
   });
 });
 
-describe_only_db('postgres')('Parse.Query Full Text Search testing', () => {
+describe_only_db('postgres')('[postgres] Parse.Query Full Text Search testing', () => {
   it('fullTextSearch: $diacriticSensitive - false', (done) => {
     fullTextHelper().then(() => {
       const where = {

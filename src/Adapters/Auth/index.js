@@ -9,6 +9,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 const apple = require("./apple");
 const gcenter = require("./gcenter");
 const facebook = require('./facebook');
+const facebookaccountkit = require('./facebookaccountkit');
 const instagram = require("./instagram");
 const linkedin = require("./linkedin");
 const meetup = require("./meetup");
@@ -37,6 +38,7 @@ const providers = {
   apple,
   gcenter,
   facebook,
+  facebookaccountkit,
   instagram,
   linkedin,
   meetup,

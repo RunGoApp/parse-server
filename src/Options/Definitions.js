@@ -135,6 +135,12 @@ module.exports.ParseServerOptions = {
     "env": "PARSE_SERVER_FILE_KEY",
     "help": "Key for your files"
   },
+  "preserveFileName": {
+    "env": "PARSE_SERVER_PRESERVE_FILE_NAME",
+    "help": "Enable (or disable) the addition of a unique hash to the file names",
+    "action": parsers.booleanParser,
+    "default": false
+  },
   "userSensitiveFields": {
     "env": "PARSE_SERVER_USER_SENSITIVE_FIELDS",
     "help": "Personally identifiable information fields in the user table the should be removed for non-authorized users.",
@@ -262,6 +268,12 @@ module.exports.ParseServerOptions = {
     "action": parsers.booleanParser,
     "default": false
   },
+  "enableExpressErrorHandler": {
+    "env": "PARSE_SERVER_ENABLE_EXPRESS_ERROR_HANDLER",
+    "help": "Enables the default express error handler for all errors",
+    "action": parsers.booleanParser,
+    "default": false
+  },
   "objectIdSize": {
     "env": "PARSE_SERVER_OBJECT_ID_SIZE",
     "help": "Sets the number of characters in generated object id's, default 10",
@@ -372,7 +384,7 @@ module.exports.LiveQueryServerOptions = {
   },
   "port": {
     "env": "PARSE_LIVE_QUERY_SERVER_PORT",
-    "help": "The port to run the ParseServer. defaults to 1337.",
+    "help": "The port to run the LiveQuery server. Defaults to 1337.",
     "action": parsers.numberParser("port"),
     "default": 1337
   },

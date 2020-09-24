@@ -1,8 +1,8 @@
-const LoggerController = require('../src/Controllers/LoggerController').LoggerController;
-const WinstonLoggerAdapter = require('../src/Adapters/Logger/WinstonLoggerAdapter').WinstonLoggerAdapter;
-const GridStoreAdapter = require("../src/Adapters/Files/GridStoreAdapter").GridStoreAdapter;
-const Config = require("../src/Config");
-const FilesController = require('../src/Controllers/FilesController').default;
+const LoggerController = require('../lib/Controllers/LoggerController').LoggerController;
+const WinstonLoggerAdapter = require('../lib/Adapters/Logger/WinstonLoggerAdapter').WinstonLoggerAdapter;
+const GridStoreAdapter = require("../lib/Adapters/Files/GridStoreAdapter").GridStoreAdapter;
+const Config = require("../lib/Config");
+const FilesController = require('../lib/Controllers/FilesController').default;
 
 const mockAdapter = {
   createFile: () => {
@@ -14,22 +14,22 @@ const mockAdapter = {
 }
 
 // Small additional tests to improve overall coverage
-describe("FilesController",() =>{
+describe("FilesController", () => {
   it("should properly expand objects", (done) => {
 
-    var config = Config.get(Parse.applicationId);
-    var gridStoreAdapter = new GridStoreAdapter('mongodb://localhost:27017/parse');
-    var filesController = new FilesController(gridStoreAdapter)
-    var result = filesController.expandFilesInObject(config, function(){});
+    const config = Config.get(Parse.applicationId);
+    const gridStoreAdapter = new GridStoreAdapter('mongodb://localhost:27017/parse');
+    const filesController = new FilesController(gridStoreAdapter)
+    const result = filesController.expandFilesInObject(config, function () { });
 
     expect(result).toBeUndefined();
 
-    var fullFile = {
+    const fullFile = {
       type: '__type',
       url: "http://an.url"
     }
 
-    var anObject = {
+    const anObject = {
       aFile: fullFile
     }
     filesController.expandFilesInObject(config, anObject);
@@ -43,7 +43,7 @@ describe("FilesController",() =>{
 
     reconfigureServer({ filesAdapter: mockAdapter })
       .then(() => new Promise(resolve => setTimeout(resolve, 1000)))
-      .then(() => new Parse.File("yolo.txt", [1,2,3], "text/plain").save())
+      .then(() => new Parse.File("yolo.txt", [1, 2, 3], "text/plain").save())
       .then(
         () => done.fail('should not succeed'),
         () => setImmediate(() => Parse.Promise.as('done'))
@@ -62,4 +62,40 @@ describe("FilesController",() =>{
         done();
       });
   });
+
+  it("should add a unique hash to the file name when the preserveFileName option is false", (done) => {
+
+    const config = Config.get(Parse.applicationId)
+    const gridStoreAdapter = new GridStoreAdapter('mongodb://localhost:27017/parse')
+    spyOn(gridStoreAdapter, 'createFile')
+    gridStoreAdapter.createFile.and.returnValue(Promise.resolve())
+    const fileName = 'randomFileName.pdf'
+    const regexEscapedFileName = fileName.replace(/\./g, "\\$&")
+    const filesController = new FilesController(gridStoreAdapter, null, { preserveFileName: false })
+
+    filesController.createFile(config, fileName)
+
+    expect(gridStoreAdapter.createFile).toHaveBeenCalledTimes(1)
+    expect(gridStoreAdapter.createFile.calls.mostRecent().args[0]).toMatch(`^.{32}_${regexEscapedFileName}$`)
+
+    done();
+  });
+
+  it("should not add a unique hash to the file name when the preserveFileName option is true", (done) => {
+
+    const config = Config.get(Parse.applicationId)
+    const gridStoreAdapter = new GridStoreAdapter('mongodb://localhost:27017/parse')
+    spyOn(gridStoreAdapter, 'createFile')
+    gridStoreAdapter.createFile.and.returnValue(Promise.resolve())
+    const fileName = 'randomFileName.pdf'
+    const filesController = new FilesController(gridStoreAdapter, null, { preserveFileName: true })
+
+    filesController.createFile(config, fileName)
+
+    expect(gridStoreAdapter.createFile).toHaveBeenCalledTimes(1)
+    expect(gridStoreAdapter.createFile.calls.mostRecent().args[0]).toEqual(fileName)
+
+    done();
+  });
+
 });

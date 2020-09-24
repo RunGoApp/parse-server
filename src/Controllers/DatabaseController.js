@@ -50,7 +50,7 @@ const transformObjectACL = ({ ACL, ...result }) => {
   return result;
 }
 
-const specialQuerykeys = ['$and', '$or', '_rperm', '_wperm', '_perishable_token', '_email_verify_token', '_email_verify_token_expires_at', '_account_lockout_expires_at', '_failed_login_count'];
+const specialQuerykeys = ['$and', '$or', '$nor', '_rperm', '_wperm', '_perishable_token', '_email_verify_token', '_email_verify_token_expires_at', '_account_lockout_expires_at', '_failed_login_count'];
 
 const isSpecialQueryKey = key => {
   return specialQuerykeys.indexOf(key) >= 0;
@@ -111,6 +111,14 @@ const validateQuery = (query: any): void => {
     }
   }
 
+  if (query.$nor) {
+    if (query.$nor instanceof Array && query.$nor.length > 0) {
+      query.$nor.forEach(validateQuery);
+    } else {
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Bad $nor format - use an array of at least 1 value.');
+    }
+  }
+
   Object.keys(query).forEach(key => {
     if (query && query[key] && query[key].$regex) {
       if (typeof query[key].$options === 'string') {
@@ -147,6 +155,7 @@ const filterSensitiveData = (isMaster, aclGroup, className, object) => {
   delete object._failed_login_count;
   delete object._account_lockout_expires_at;
   delete object._password_changed_at;
+  delete object._password_history;
 
   if ((aclGroup.indexOf(object.objectId) > -1)) {
     return object;
@@ -285,6 +294,16 @@ const untransformObjectACL = ({_rperm, _wperm, ...output}) => {
   return output;
 }
 
+/**
+ * When querying, the fieldName may be compound, extract the root fieldName
+ *     `temperature.celsius` becomes `temperature`
+ * @param {string} fieldName that may be a compound field name
+ * @returns {string} the root name of the field
+ */
+const getRootFieldName = (fieldName: string): string => {
+  return fieldName.split('.')[0]
+}
+
 const relationSchema = { fields: { relatedId: { type: 'String' }, owningId: { type: 'String' } } };
 
 class DatabaseController {
@@ -402,13 +421,13 @@ class DatabaseController {
                   if (fieldName.match(/^authData\.([a-zA-Z0-9_]+)\.id$/)) {
                     throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, `Invalid field name for update: ${fieldName}`);
                   }
-                  fieldName = fieldName.split('.')[0];
-                  if (!SchemaController.fieldNameIsValid(fieldName) && !isSpecialUpdateKey(fieldName)) {
+                  const rootFieldName = getRootFieldName(fieldName);
+                  if (!SchemaController.fieldNameIsValid(rootFieldName) && !isSpecialUpdateKey(rootFieldName)) {
                     throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, `Invalid field name for update: ${fieldName}`);
                   }
                 });
-                for (const updateOperation: any in update) {
-                  if (Object.keys(updateOperation).some(innerKey => innerKey.includes('$') || innerKey.includes('.'))) {
+                for (const updateOperation in update) {
+                  if (update[updateOperation] && typeof update[updateOperation] === 'object' && Object.keys(update[updateOperation]).some(innerKey => innerKey.includes('$') || innerKey.includes('.'))) {
                     throw new Parse.Error(Parse.Error.INVALID_NESTED_KEY, "Nested keys should not contain the '$' or '.' characters");
                   }
                 }
@@ -511,7 +530,7 @@ class DatabaseController {
   addRelation(key: string, fromClassName: string, fromId: string, toId: string) {
     const doc = {
       relatedId: toId,
-      owningId : fromId
+      owningId: fromId
     };
     return this.adapter.upsertOneObject(`_Join:${key}:${fromClassName}`, relationSchema, doc, doc);
   }
@@ -622,8 +641,12 @@ class DatabaseController {
     const fields = Object.keys(object);
     const schemaFields = Object.keys(classSchema);
     const newKeys = fields.filter((field) => {
+      // Skip fields that are unset
+      if (object[field] && object[field].__op && object[field].__op === 'Delete') {
+        return false;
+      }
       return schemaFields.indexOf(field) < 0;
-    })
+    });
     if (newKeys.length > 0) {
       return schema.validatePermission(className, aclGroup, 'addField');
     }
@@ -631,11 +654,16 @@ class DatabaseController {
   }
 
   // Won't delete collections in the system namespace
-  // Returns a promise.
-  deleteEverything() {
+  /**
+   * Delete all classes and clears the schema cache
+   *
+   * @param {boolean} fast set to true if it's ok to just delete rows and not indexes
+   * @returns {Promise<void>} when the deletions completes
+   */
+  deleteEverything(fast: boolean = false): Promise<any> {
     this.schemaPromise = null;
     return Promise.all([
-      this.adapter.deleteAllClasses(),
+      this.adapter.deleteAllClasses(fast),
       this.schemaCache.clear()
     ]);
   }
@@ -658,7 +686,7 @@ class DatabaseController {
 
   // Returns a promise for a list of owning ids given some related ids.
   // className here is the owning className.
-  owningIds(className: string, key: string, relatedIds: string): Promise<string[]> {
+  owningIds(className: string, key: string, relatedIds: string[]): Promise<string[]> {
     return this.adapter.find(joinTableName(className, key), relationSchema, { relatedId: { '$in': relatedIds } }, {})
       .then(results => results.map(result => result.owningId));
   }
@@ -846,7 +874,8 @@ class DatabaseController {
     op,
     distinct,
     pipeline,
-    readPreference
+    readPreference,
+    isWrite,
   }: any = {}): Promise<any> {
     const isMaster = acl === undefined;
     const aclGroup = acl || [];
@@ -887,7 +916,8 @@ class DatabaseController {
               if (fieldName.match(/^authData\.([a-zA-Z0-9_]+)\.id$/)) {
                 throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, `Cannot sort by ${fieldName}`);
               }
-              if (!SchemaController.fieldNameIsValid(fieldName)) {
+              const rootFieldName = getRootFieldName(fieldName);
+              if (!SchemaController.fieldNameIsValid(rootFieldName)) {
                 throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, `Invalid field name: ${fieldName}.`);
               }
             });
@@ -906,7 +936,11 @@ class DatabaseController {
                   }
                 }
                 if (!isMaster) {
-                  query = addReadACL(query, aclGroup);
+                  if (isWrite) {
+                    query = addWriteACL(query, aclGroup);
+                  } else {
+                    query = addReadACL(query, aclGroup);
+                  }
                 }
                 validateQuery(query);
                 if (count) {

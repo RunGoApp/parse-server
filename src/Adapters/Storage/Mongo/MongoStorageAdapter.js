@@ -23,6 +23,7 @@ import Parse                 from 'parse/node';
 // @flow-disable-next
 import _                     from 'lodash';
 import defaults              from '../../../defaults';
+import logger                from '../../../logger';
 
 // @flow-disable-next
 const mongodb = require('mongodb');
@@ -160,6 +161,16 @@ export class MongoStorageAdapter implements StorageAdapter {
     return this.connectionPromise;
   }
 
+  handleError<T>(error: ?(Error | Parse.Error)): Promise<T> {
+    if (error && error.code === 13) { // Unauthorized error
+      delete this.client;
+      delete this.database;
+      delete this.connectionPromise;
+      logger.error('Received unauthorized error', { error: error });
+    }
+    throw error;
+  }
+
   handleShutdown() {
     if (!this.client) {
       return;
@@ -170,7 +181,8 @@ export class MongoStorageAdapter implements StorageAdapter {
   _adaptiveCollection(name: string) {
     return this.connect()
       .then(() => this.database.collection(this._collectionPrefix + name))
-      .then(rawCollection => new MongoCollection(rawCollection));
+      .then(rawCollection => new MongoCollection(rawCollection))
+      .catch(err => this.handleError(err));
   }
 
   _schemaCollection(): Promise<MongoSchemaCollection> {
@@ -184,14 +196,14 @@ export class MongoStorageAdapter implements StorageAdapter {
       return this.database.listCollections({ name: this._collectionPrefix + name }).toArray();
     }).then(collections => {
       return collections.length > 0;
-    });
+    }).catch(err => this.handleError(err));
   }
 
   setClassLevelPermissions(className: string, CLPs: any): Promise<void> {
     return this._schemaCollection()
       .then(schemaCollection => schemaCollection.updateSchema(className, {
         $set: { '_metadata.class_permissions': CLPs }
-      }));
+      })).catch(err => this.handleError(err));
   }
 
   setIndexesWithSchemaFormat(className: string, submittedIndexes: any, existingIndexes: any = {}, fields: any): Promise<void> {
@@ -237,7 +249,8 @@ export class MongoStorageAdapter implements StorageAdapter {
       .then(() => this._schemaCollection())
       .then(schemaCollection => schemaCollection.updateSchema(className, {
         $set: { '_metadata.indexes':  existingIndexes }
-      }));
+      }))
+      .catch(err => this.handleError(err));
   }
 
   setIndexesFromMongo(className: string) {
@@ -257,10 +270,12 @@ export class MongoStorageAdapter implements StorageAdapter {
         .then(schemaCollection => schemaCollection.updateSchema(className, {
           $set: { '_metadata.indexes': indexes }
         }));
-    }).catch(() => {
-      // Ignore if collection not found
-      return Promise.resolve();
-    });
+    })
+      .catch(err => this.handleError(err))
+      .catch(() => {
+        // Ignore if collection not found
+        return Promise.resolve();
+      });
   }
 
   createClass(className: string, schema: SchemaType): Promise<void> {
@@ -269,13 +284,15 @@ export class MongoStorageAdapter implements StorageAdapter {
     mongoObject._id = className;
     return this.setIndexesWithSchemaFormat(className, schema.indexes, {}, schema.fields)
       .then(() => this._schemaCollection())
-      .then(schemaCollection => schemaCollection.insertSchema(mongoObject));
+      .then(schemaCollection => schemaCollection.insertSchema(mongoObject))
+      .catch(err => this.handleError(err));
   }
 
   addFieldIfNotExists(className: string, fieldName: string, type: any): Promise<void> {
     return this._schemaCollection()
       .then(schemaCollection => schemaCollection.addFieldIfNotExists(className, fieldName, type))
-      .then(() => this.createIndexesIfNeeded(className, fieldName, type));
+      .then(() => this.createIndexesIfNeeded(className, fieldName, type))
+      .catch(err => this.handleError(err));
   }
 
   // Drops a collection. Resolves with true if it was a Parse Schema (eg. _User, Custom, etc.)
@@ -293,12 +310,12 @@ export class MongoStorageAdapter implements StorageAdapter {
     // We've dropped the collection, now remove the _SCHEMA document
       .then(() => this._schemaCollection())
       .then(schemaCollection => schemaCollection.findAndDeleteSchema(className))
+      .catch(err => this.handleError(err));
   }
 
-  // Delete all data known to this adapter. Used for testing.
-  deleteAllClasses() {
+  deleteAllClasses(fast: boolean) {
     return storageAdapterAllCollections(this)
-      .then(collections => Promise.all(collections.map(collection => collection.drop())));
+      .then(collections => Promise.all(collections.map(collection => fast ? collection.remove({}) : collection.drop())));
   }
 
   // Remove the column and all the data. For Relations, the _Join collection is handled
@@ -342,14 +359,16 @@ export class MongoStorageAdapter implements StorageAdapter {
     return this._adaptiveCollection(className)
       .then(collection => collection.updateMany({}, collectionUpdate))
       .then(() => this._schemaCollection())
-      .then(schemaCollection => schemaCollection.updateSchema(className, schemaUpdate));
+      .then(schemaCollection => schemaCollection.updateSchema(className, schemaUpdate))
+      .catch(err => this.handleError(err));
   }
 
   // Return a promise for all schemas known to this adapter, in Parse format. In case the
   // schemas cannot be retrieved, returns a promise that rejects. Requirements for the
   // rejection reason are TBD.
   getAllClasses(): Promise<StorageClass[]> {
-    return this._schemaCollection().then(schemasCollection => schemasCollection._fetchAllSchemasFrom_SCHEMA());
+    return this._schemaCollection().then(schemasCollection => schemasCollection._fetchAllSchemasFrom_SCHEMA())
+      .catch(err => this.handleError(err));
   }
 
   // Return a promise for the schema with the given name, in Parse format. If
@@ -358,6 +377,7 @@ export class MongoStorageAdapter implements StorageAdapter {
   getClass(className: string): Promise<StorageClass> {
     return this._schemaCollection()
       .then(schemasCollection => schemasCollection._fetchOneSchemaFrom_SCHEMA(className))
+      .catch(err => this.handleError(err));
   }
 
   // TODO: As yet not particularly well specified. Creates an object. Maybe shouldn't even need the schema,
@@ -381,7 +401,8 @@ export class MongoStorageAdapter implements StorageAdapter {
           throw err;
         }
         throw error;
-      });
+      })
+      .catch(err => this.handleError(err));
   }
 
   // Remove all objects that match the given Parse Query.
@@ -394,6 +415,7 @@ export class MongoStorageAdapter implements StorageAdapter {
         const mongoWhere = transformWhere(className, query, schema);
         return collection.deleteMany(mongoWhere)
       })
+      .catch(err => this.handleError(err))
       .then(({ result }) => {
         if (result.n === 0) {
           throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
@@ -410,7 +432,8 @@ export class MongoStorageAdapter implements StorageAdapter {
     const mongoUpdate = transformUpdate(className, update, schema);
     const mongoWhere = transformWhere(className, query, schema);
     return this._adaptiveCollection(className)
-      .then(collection => collection.updateMany(mongoWhere, mongoUpdate));
+      .then(collection => collection.updateMany(mongoWhere, mongoUpdate))
+      .catch(err => this.handleError(err));
   }
 
   // Atomically finds and updates an object based on query.
@@ -421,7 +444,14 @@ export class MongoStorageAdapter implements StorageAdapter {
     const mongoWhere = transformWhere(className, query, schema);
     return this._adaptiveCollection(className)
       .then(collection => collection._mongoCollection.findAndModify(mongoWhere, [], mongoUpdate, { new: true }))
-      .then(result => mongoObjectToParseObject(className, result.value, schema));
+      .then(result => mongoObjectToParseObject(className, result.value, schema))
+      .catch(error => {
+        if (error.code === 11000) {
+          throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'A duplicate value for a field with unique values was provided');
+        }
+        throw error;
+      })
+      .catch(err => this.handleError(err));
   }
 
   // Hopefully we can get rid of this. It's only used for config and hooks.
@@ -430,7 +460,8 @@ export class MongoStorageAdapter implements StorageAdapter {
     const mongoUpdate = transformUpdate(className, update, schema);
     const mongoWhere = transformWhere(className, query, schema);
     return this._adaptiveCollection(className)
-      .then(collection => collection.upsertOne(mongoWhere, mongoUpdate));
+      .then(collection => collection.upsertOne(mongoWhere, mongoUpdate))
+      .catch(err => this.handleError(err));
   }
 
   // Executes a find. Accepts: className, query in Parse format, and { skip, limit, sort }.
@@ -455,6 +486,7 @@ export class MongoStorageAdapter implements StorageAdapter {
         readPreference,
       }))
       .then(objects => objects.map(object => mongoObjectToParseObject(className, object, schema)))
+      .catch(err => this.handleError(err));
   }
 
   // Create a unique index. Unique indexes on nullable fields are not allowed. Since we don't
@@ -476,14 +508,15 @@ export class MongoStorageAdapter implements StorageAdapter {
           throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'Tried to ensure field uniqueness for a class that already has duplicates.');
         }
         throw error;
-      });
+      })
+      .catch(err => this.handleError(err));
   }
 
   // Used in tests
   _rawFind(className: string, query: QueryType) {
     return this._adaptiveCollection(className).then(collection => collection.find(query, {
       maxTimeMS: this._maxTimeMS,
-    }));
+    })).catch(err => this.handleError(err));
   }
 
   // Executes a count.
@@ -494,7 +527,8 @@ export class MongoStorageAdapter implements StorageAdapter {
       .then(collection => collection.count(transformWhere(className, query, schema), {
         maxTimeMS: this._maxTimeMS,
         readPreference,
-      }));
+      }))
+      .catch(err => this.handleError(err));
   }
 
   distinct(className: string, schema: SchemaType, query: QueryType, fieldName: string) {
@@ -505,49 +539,53 @@ export class MongoStorageAdapter implements StorageAdapter {
     }
     return this._adaptiveCollection(className)
       .then(collection => collection.distinct(fieldName, transformWhere(className, query, schema)))
-      .then(objects => objects.map(object => {
-        if (isPointerField) {
-          const field = fieldName.substring(3);
-          return transformPointerString(schema, field, object);
-        }
-        return mongoObjectToParseObject(className, object, schema);
-      }));
+      .then(objects => {
+        objects = objects.filter((obj) => obj != null);
+        return objects.map(object => {
+          if (isPointerField) {
+            const field = fieldName.substring(3);
+            return transformPointerString(schema, field, object);
+          }
+          return mongoObjectToParseObject(className, object, schema);
+        });
+      })
+      .catch(err => this.handleError(err));
   }
 
   aggregate(className: string, schema: any, pipeline: any, readPreference: ?string) {
     let isPointerField = false;
     pipeline = pipeline.map((stage) => {
-      if (stage.$group && stage.$group._id) {
-        const field = stage.$group._id.substring(1);
-        if (schema.fields[field] && schema.fields[field].type === 'Pointer') {
+      if (stage.$group) {
+        stage.$group = this._parseAggregateGroupArgs(schema, stage.$group);
+        if (stage.$group._id && (typeof stage.$group._id === 'string') && stage.$group._id.indexOf('$_p_') >= 0) {
           isPointerField = true;
-          stage.$group._id = `$_p_${field}`;
         }
       }
       if (stage.$match) {
-        for (const field in stage.$match) {
-          if (schema.fields[field] && schema.fields[field].type === 'Pointer') {
-            const transformMatch = { [`_p_${field}`] : `${className}$${stage.$match[field]}` };
-            stage.$match = transformMatch;
-          }
-          if (field === 'objectId') {
-            const transformMatch = Object.assign({}, stage.$match);
-            transformMatch._id = stage.$match[field];
-            delete transformMatch.objectId;
-            stage.$match = transformMatch;
-          }
-        }
+        stage.$match = this._parseAggregateArgs(schema, stage.$match);
+      }
+      if (stage.$project) {
+        stage.$project = this._parseAggregateProjectArgs(schema, stage.$project);
       }
       return stage;
     });
     readPreference = this._parseReadPreference(readPreference);
     return this._adaptiveCollection(className)
       .then(collection => collection.aggregate(pipeline, { readPreference, maxTimeMS: this._maxTimeMS }))
+      .catch(error => {
+        if (error.code === 16006) {
+          throw new Parse.Error(Parse.Error.INVALID_QUERY, error.message);
+        }
+        throw error;
+      })
       .then(results => {
         results.forEach(result => {
           if (result.hasOwnProperty('_id')) {
             if (isPointerField && result._id) {
               result._id = result._id.split('$')[1];
+            }
+            if (result._id == null || _.isEmpty(result._id)) {
+              result._id = null;
             }
             result.objectId = result._id;
             delete result._id;
@@ -555,7 +593,132 @@ export class MongoStorageAdapter implements StorageAdapter {
         });
         return results;
       })
-      .then(objects => objects.map(object => mongoObjectToParseObject(className, object, schema)));
+      .then(objects => objects.map(object => mongoObjectToParseObject(className, object, schema)))
+      .catch(err => this.handleError(err));
+  }
+
+  // This function will recursively traverse the pipeline and convert any Pointer or Date columns.
+  // If we detect a pointer column we will rename the column being queried for to match the column
+  // in the database. We also modify the value to what we expect the value to be in the database
+  // as well.
+  // For dates, the driver expects a Date object, but we have a string coming in. So we'll convert
+  // the string to a Date so the driver can perform the necessary comparison.
+  //
+  // The goal of this method is to look for the "leaves" of the pipeline and determine if it needs
+  // to be converted. The pipeline can have a few different forms. For more details, see:
+  //     https://docs.mongodb.com/manual/reference/operator/aggregation/
+  //
+  // If the pipeline is an array, it means we are probably parsing an '$and' or '$or' operator. In
+  // that case we need to loop through all of it's children to find the columns being operated on.
+  // If the pipeline is an object, then we'll loop through the keys checking to see if the key name
+  // matches one of the schema columns. If it does match a column and the column is a Pointer or
+  // a Date, then we'll convert the value as described above.
+  //
+  // As much as I hate recursion...this seemed like a good fit for it. We're essentially traversing
+  // down a tree to find a "leaf node" and checking to see if it needs to be converted.
+  _parseAggregateArgs(schema: any, pipeline: any): any {
+    if (Array.isArray(pipeline)) {
+      return pipeline.map((value) => this._parseAggregateArgs(schema, value));
+    } else if (typeof pipeline === 'object') {
+      const returnValue = {};
+      for (const field in pipeline) {
+        if (schema.fields[field] && schema.fields[field].type === 'Pointer') {
+          if (typeof pipeline[field] === 'object') {
+            // Pass objects down to MongoDB...this is more than likely an $exists operator.
+            returnValue[`_p_${field}`] = pipeline[field];
+          } else {
+            returnValue[`_p_${field}`] = `${schema.fields[field].targetClass}$${pipeline[field]}`;
+          }
+        } else if (schema.fields[field] && schema.fields[field].type === 'Date') {
+          returnValue[field] = this._convertToDate(pipeline[field]);
+        } else {
+          returnValue[field] = this._parseAggregateArgs(schema, pipeline[field]);
+        }
+
+        if (field === 'objectId') {
+          returnValue['_id'] = returnValue[field];
+          delete returnValue[field];
+        } else if (field === 'createdAt') {
+          returnValue['_created_at'] = returnValue[field];
+          delete returnValue[field];
+        } else if (field === 'updatedAt') {
+          returnValue['_updated_at'] = returnValue[field];
+          delete returnValue[field];
+        }
+      }
+      return returnValue;
+    }
+    return pipeline;
+  }
+
+  // This function is slightly different than the one above. Rather than trying to combine these
+  // two functions and making the code even harder to understand, I decided to split it up. The
+  // difference with this function is we are not transforming the values, only the keys of the
+  // pipeline.
+  _parseAggregateProjectArgs(schema: any, pipeline: any): any {
+    const returnValue = {};
+    for (const field in pipeline) {
+      if (schema.fields[field] && schema.fields[field].type === 'Pointer') {
+        returnValue[`_p_${field}`] = pipeline[field];
+      } else {
+        returnValue[field] = this._parseAggregateArgs(schema, pipeline[field]);
+      }
+
+      if (field === 'objectId') {
+        returnValue['_id'] = returnValue[field];
+        delete returnValue[field];
+      } else if (field === 'createdAt') {
+        returnValue['_created_at'] = returnValue[field];
+        delete returnValue[field];
+      } else if (field === 'updatedAt') {
+        returnValue['_updated_at'] = returnValue[field];
+        delete returnValue[field];
+      }
+    }
+    return returnValue;
+  }
+
+  // This function is slightly different than the two above. MongoDB $group aggregate looks like:
+  //     { $group: { _id: <expression>, <field1>: { <accumulator1> : <expression1> }, ... } }
+  // The <expression> could be a column name, prefixed with the '$' character. We'll look for
+  // these <expression> and check to see if it is a 'Pointer' or if it's one of createdAt,
+  // updatedAt or objectId and change it accordingly.
+  _parseAggregateGroupArgs(schema: any, pipeline: any): any {
+    if (Array.isArray(pipeline)) {
+      return pipeline.map((value) => this._parseAggregateGroupArgs(schema, value));
+    } else if (typeof pipeline === 'object') {
+      const returnValue = {};
+      for (const field in pipeline) {
+        returnValue[field] = this._parseAggregateGroupArgs(schema, pipeline[field]);
+      }
+      return returnValue;
+    } else if (typeof pipeline === 'string') {
+      const field = pipeline.substring(1);
+      if (schema.fields[field] && schema.fields[field].type === 'Pointer') {
+        return `$_p_${field}`;
+      } else if (field == 'createdAt') {
+        return '$_created_at';
+      } else if (field == 'updatedAt') {
+        return '$_updated_at';
+      }
+    }
+    return pipeline;
+  }
+
+  // This function will attempt to convert the provided value to a Date object. Since this is part
+  // of an aggregation pipeline, the value can either be a string or it can be another object with
+  // an operator in it (like $gt, $lt, etc). Because of this I felt it was easier to make this a
+  // recursive method to traverse down to the "leaf node" which is going to be the string.
+  _convertToDate(value: any): any {
+    if (typeof value === 'string') {
+      return new Date(value);
+    }
+
+    const returnValue = {}
+    for (const field in value) {
+      returnValue[field] = this._convertToDate(value[field])
+    }
+    return returnValue;
   }
 
   _parseReadPreference(readPreference: ?string): ?string {
@@ -576,8 +739,6 @@ export class MongoStorageAdapter implements StorageAdapter {
       readPreference = ReadPreference.NEAREST;
       break;
     case undefined:
-      // this is to match existing tests, which were failing as mongodb@3.0 don't report readPreference anymore
-      readPreference = ReadPreference.PRIMARY;
       break;
     default:
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Not supported read preference.');
@@ -591,12 +752,14 @@ export class MongoStorageAdapter implements StorageAdapter {
 
   createIndex(className: string, index: any) {
     return this._adaptiveCollection(className)
-      .then(collection => collection._mongoCollection.createIndex(index));
+      .then(collection => collection._mongoCollection.createIndex(index))
+      .catch(err => this.handleError(err));
   }
 
   createIndexes(className: string, indexes: any) {
     return this._adaptiveCollection(className)
-      .then(collection => collection._mongoCollection.createIndexes(indexes));
+      .then(collection => collection._mongoCollection.createIndexes(indexes))
+      .catch(err => this.handleError(err));
   }
 
   createIndexesIfNeeded(className: string, fieldName: string, type: any) {
@@ -638,17 +801,20 @@ export class MongoStorageAdapter implements StorageAdapter {
 
   getIndexes(className: string) {
     return this._adaptiveCollection(className)
-      .then(collection => collection._mongoCollection.indexes());
+      .then(collection => collection._mongoCollection.indexes())
+      .catch(err => this.handleError(err));
   }
 
   dropIndex(className: string, index: any) {
     return this._adaptiveCollection(className)
-      .then(collection => collection._mongoCollection.dropIndex(index));
+      .then(collection => collection._mongoCollection.dropIndex(index))
+      .catch(err => this.handleError(err));
   }
 
   dropAllIndexes(className: string) {
     return this._adaptiveCollection(className)
-      .then(collection => collection._mongoCollection.dropIndexes());
+      .then(collection => collection._mongoCollection.dropIndexes())
+      .catch(err => this.handleError(err));
   }
 
   updateSchemaWithIndexes(): Promise<any> {
@@ -658,7 +824,8 @@ export class MongoStorageAdapter implements StorageAdapter {
           return this.setIndexesFromMongo(schema.className);
         });
         return Promise.all(promises);
-      });
+      })
+      .catch(err => this.handleError(err));
   }
 }
 

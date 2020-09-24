@@ -1,11 +1,11 @@
 "use strict"
 // Sets up a Parse API server for testing.
 const SpecReporter = require('jasmine-spec-reporter').SpecReporter;
-
+const supportsColor = require('supports-color');
 jasmine.DEFAULT_TIMEOUT_INTERVAL = process.env.PARSE_SERVER_TEST_TIMEOUT || 5000;
 
 jasmine.getEnv().clearReporters();
-jasmine.getEnv().addReporter(new SpecReporter());
+jasmine.getEnv().addReporter(new SpecReporter({ colors: { enabled: supportsColor.stdout }, spec: { displayDuration: true }}));
 
 global.on_db = (db, callback, elseCallback) => {
   if (process.env.PARSE_SERVER_TEST_DB == db) {
@@ -23,15 +23,15 @@ if (global._babelPolyfill) {
   process.exit(1);
 }
 
-var cache = require('../src/cache').default;
-var ParseServer = require('../src/index').ParseServer;
-var path = require('path');
-var TestUtils = require('../src/TestUtils');
-const GridStoreAdapter = require('../src/Adapters/Files/GridStoreAdapter').GridStoreAdapter;
+const cache = require('../lib/cache').default;
+const ParseServer = require('../lib/index').ParseServer;
+const path = require('path');
+const TestUtils = require('../lib/TestUtils');
+const GridStoreAdapter = require('../lib/Adapters/Files/GridStoreAdapter').GridStoreAdapter;
 const FSAdapter = require('@parse/fs-files-adapter');
-import PostgresStorageAdapter from '../src/Adapters/Storage/Postgres/PostgresStorageAdapter';
-import MongoStorageAdapter from '../src/Adapters/Storage/Mongo/MongoStorageAdapter';
-const RedisCacheAdapter = require('../src/Adapters/Cache/RedisCacheAdapter').default;
+const PostgresStorageAdapter = require('../lib/Adapters/Storage/Postgres/PostgresStorageAdapter').default;
+const MongoStorageAdapter = require('../lib/Adapters/Storage/Mongo/MongoStorageAdapter').default;
+const RedisCacheAdapter = require('../lib/Adapters/Cache/RedisCacheAdapter').default;
 
 const mongoURI = 'mongodb://localhost:27017/parseServerMongoAdapterTestDatabase';
 const postgresURI = 'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
@@ -58,7 +58,7 @@ if (process.env.PARSE_SERVER_TEST_DB === 'postgres') {
   });
 }
 
-var port = 8378;
+const port = 8378;
 
 let filesAdapter;
 
@@ -79,7 +79,7 @@ if (process.env.PARSE_SERVER_LOG_LEVEL) {
   logLevel = process.env.PARSE_SERVER_LOG_LEVEL;
 }
 // Default server configuration for tests.
-var defaultConfiguration = {
+const defaultConfiguration = {
   filesAdapter,
   serverURL: 'http://localhost:' + port + '/1',
   databaseAdapter,
@@ -114,9 +114,8 @@ if (process.env.PARSE_SERVER_TEST_CACHE === 'redis') {
 }
 
 const openConnections = {};
-
 // Set up a default API server for testing with default configuration.
-var server;
+let server;
 
 // Allows testing specific configurations of Parse Server
 const reconfigureServer = changedConfiguration => {
@@ -153,7 +152,7 @@ const reconfigureServer = changedConfiguration => {
 }
 
 // Set up a Parse client to talk to our test API server
-var Parse = require('parse/node');
+const Parse = require('parse/node');
 Parse.serverURL = 'http://localhost:' + port + '/1';
 
 // This is needed because we ported a bunch of tests from the non-A+ way.
@@ -173,7 +172,7 @@ beforeEach(done => {
       throw error;
     }
   }
-  TestUtils.destroyAllDataPermanently()
+  TestUtils.destroyAllDataPermanently(true)
     .catch(error => {
     // For tests that connect to their own mongo, there won't be any data to delete.
       if (error.message === 'ns not found' || error.message.startsWith('connect ECONNREFUSED')) {
@@ -197,14 +196,14 @@ afterEach(function(done) {
       fail('There were open connections to the server left after the test finished');
     }
     on_db('postgres', () => {
-      TestUtils.destroyAllDataPermanently().then(done, done);
+      TestUtils.destroyAllDataPermanently(true).then(done, done);
     }, done);
   };
   Parse.Cloud._removeAllHooks();
   databaseAdapter.getAllClasses()
     .then(allSchemas => {
       allSchemas.forEach((schema) => {
-        var className = schema.className;
+        const className = schema.className;
         expect(className).toEqual({ asymmetricMatch: className => {
           if (!className.startsWith('_')) {
             return true;
@@ -217,30 +216,37 @@ afterEach(function(done) {
       });
     })
     .then(() => Parse.User.logOut())
-    .then(afterLogOut, afterLogOut)
+    .then(() => {}, () => {}) // swallow errors
+    .then(() => {
+      // Connection close events are not immediate on node 10+... wait a bit
+      return new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    })
+    .then(afterLogOut)
 });
 
-var TestObject = Parse.Object.extend({
+const TestObject = Parse.Object.extend({
   className: "TestObject"
 });
-var Item = Parse.Object.extend({
+const Item = Parse.Object.extend({
   className: "Item"
 });
-var Container = Parse.Object.extend({
+const Container = Parse.Object.extend({
   className: "Container"
 });
 
 // Convenience method to create a new TestObject with a callback
 function create(options, callback) {
-  var t = new TestObject(options);
+  const t = new TestObject(options);
   t.save(null, { success: callback });
 }
 
 function createTestUser(success, error) {
-  var user = new Parse.User();
+  const user = new Parse.User();
   user.set('username', 'test');
   user.set('password', 'moon-y');
-  var promise = user.signUp();
+  const promise = user.signUp();
   if (success || error) {
     promise.then(function(user) {
       if (success) {
@@ -287,11 +293,13 @@ function expectError(errorCode, callback) {
     error: function(obj, e) {
       // Some methods provide 2 parameters.
       e = e || obj;
-      if (!e) {
-        fail('expected a specific error but got a blank error');
-        return;
+      if (errorCode !== undefined) {
+        if (!e) {
+          fail('expected a specific error but got a blank error');
+          return;
+        }
+        expect(e.code).toEqual(errorCode, e.message);
       }
-      expect(e.code).toEqual(errorCode, e.message);
       if (callback) {
         callback(e);
       }
@@ -312,8 +320,8 @@ function normalize(obj) {
   if (obj instanceof Array) {
     return '[' + obj.map(normalize).join(', ') + ']';
   }
-  var answer = '{';
-  for (var key of Object.keys(obj).sort()) {
+  let answer = '{';
+  for (const key of Object.keys(obj).sort()) {
     answer += key + ': ';
     answer += normalize(obj[key]);
     answer += ', ';
@@ -328,15 +336,15 @@ function jequal(o1, o2) {
 }
 
 function range(n) {
-  var answer = [];
-  for (var i = 0; i < n; i++) {
+  const answer = [];
+  for (let i = 0; i < n; i++) {
     answer.push(i);
   }
   return answer;
 }
 
 function mockFacebookAuthenticator(id, token) {
-  var facebook = {};
+  const facebook = {};
   facebook.validateAuthData = function(authData) {
     if (authData.id === id && authData.access_token.startsWith(token)) {
       return Promise.resolve();
@@ -410,7 +418,7 @@ global.it_exclude_dbs = excluded => {
 }
 
 global.it_only_db = db => {
-  if (process.env.PARSE_SERVER_TEST_DB === db) {
+  if (process.env.PARSE_SERVER_TEST_DB === db || !process.env.PARSE_SERVER_TEST_DB && db == 'mongo') {
     return it;
   } else {
     return xit;
@@ -431,7 +439,7 @@ global.describe_only_db = db => {
   } else if (!process.env.PARSE_SERVER_TEST_DB && db == 'mongo') {
     return describe;
   } else {
-    return () => {};
+    return xdescribe;
   }
 }
 
@@ -444,9 +452,9 @@ global.describe_only = (validator) =>{
 };
 
 
-var libraryCache = {};
+const libraryCache = {};
 jasmine.mockLibrary = function(library, name, mock) {
-  var original = require(library)[name];
+  const original = require(library)[name];
   if (!libraryCache[library]) {
     libraryCache[library] = {};
   }

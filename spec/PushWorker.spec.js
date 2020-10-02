@@ -1,13 +1,13 @@
-var PushWorker = require('../src').PushWorker;
-var PushUtils = require('../src/Push/utils');
-var Config = require('../src/Config');
-var { pushStatusHandler } = require('../src/StatusHandler');
-var rest = require('../src/rest');
+const PushWorker = require('../lib').PushWorker;
+const PushUtils = require('../lib/Push/utils');
+const Config = require('../lib/Config');
+const { pushStatusHandler } = require('../lib/StatusHandler');
+const rest = require('../lib/rest');
 
 describe('PushWorker', () => {
   it('should run with small batch', (done) => {
     const batchSize = 3;
-    var sendCount = 0;
+    let sendCount = 0;
     reconfigureServer({
       push: {
         queueOptions: {
@@ -27,9 +27,9 @@ describe('PushWorker', () => {
           return ['ios', 'android']
         }
       });
-      var installations = [];
+      const installations = [];
       while(installations.length != 10) {
-        var installation = new Parse.Object("_Installation");
+        const installation = new Parse.Object("_Installation");
         installation.set("installationId", "installation_" + installations.length);
         installation.set("deviceToken","device_token_" + installations.length)
         installation.set("badge", 1);
@@ -88,6 +88,10 @@ describe('PushWorker', () => {
         }
       });
       expect(locales).toEqual(['fr']);
+    });
+
+    it('should handle empty body data', () => {
+      expect(PushUtils.getLocalesFromPush({})).toEqual([]);
     });
 
     it('transforms body appropriately', () => {
@@ -164,7 +168,7 @@ describe('PushWorker', () => {
       const config = Config.get('test');
       const handler = pushStatusHandler(config);
       const spy = spyOn(config.database, "update").and.callFake(() => {
-        return Promise.resolve();
+        return Promise.resolve({});
       });
       const toAwait = handler.trackSent([
         {

@@ -1,4 +1,4 @@
-const parser = require('../src/Adapters/Storage/Postgres/PostgresConfigParser');
+const parser = require('../lib/Adapters/Storage/Postgres/PostgresConfigParser');
 
 const queryParamTests = {
   'a=1&b=2': { a: '1', b: '2' },
@@ -43,7 +43,7 @@ dbOptionsTest[`${baseURI}?ssl=&binary=aa`] = {
 describe('PostgresConfigParser.getDatabaseOptionsFromURI', () => {
   it('creates a db options map from a query string', () => {
 
-    for (const key in dbOptionsTest) {
+    for (const  key in dbOptionsTest) {
       const result = parser.getDatabaseOptionsFromURI(key);
 
       const testObj = dbOptionsTest[key];

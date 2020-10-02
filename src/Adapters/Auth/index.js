@@ -71,8 +71,6 @@ function loadAuthAdapter(provider, authOptions) {
   const defaultAdapter = providers[provider];
   const adapter = Object.assign({}, defaultAdapter);
   const providerOptions = authOptions[provider];
-  console.log("default adapter", defaultAdapter);
-  console.log("provider", provider);
 
   if (!defaultAdapter && !providerOptions) {
     return;
@@ -106,7 +104,6 @@ module.exports = function (authOptions = {}, enableAnonymousUsers = true) {
   };
   // To handle the test cases on configuration
   const getValidatorForProvider = function (provider) {
-    console.log("getValidatorForProvider", provider);
     if (provider === 'anonymous' && !_enableAnonymousUsers) {
       return;
     }
